@@ -20,7 +20,7 @@ logging.getLogger("agent_framework.azure").setLevel(logging.ERROR)
 
 import pandas as pd
 import pyodbc
-from azure.ai.inference.aio import EmbeddingsClient
+from openai import AsyncAzureOpenAI
 from azure.ai.projects.aio import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
@@ -86,8 +86,12 @@ SOLUTION_NAME = args.solution_name
 TOPIC_MINING_AGENT_NAME = f"KM-TopicMiningAgent-{SOLUTION_NAME}"
 TOPIC_MAPPING_AGENT_NAME = f"KM-TopicMappingAgent-{SOLUTION_NAME}"
 
-# Azure AI Foundry (Inference) endpoint
-inference_endpoint = f"https://{urlparse(AI_PROJECT_ENDPOINT).netloc}/models"
+# Azure OpenAI embeddings endpoint derived from the AI Foundry account hostname.
+# The Foundry Inference router (`/models`) does not serve AOAI deployments
+# (returns empty body), so we call the AOAI route directly.
+_aoai_host = urlparse(AI_PROJECT_ENDPOINT).netloc.split('.', 1)[0]
+AZURE_OPENAI_ENDPOINT = f"https://{_aoai_host}.openai.azure.com"
+AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
 
 # Azure DataLake setup
 account_url = f"https://{STORAGE_ACCOUNT_NAME}.dfs.core.windows.net"
@@ -211,9 +215,9 @@ cu_client = AzureContentUnderstandingClient(
 
 # Utility functions
 async def get_embeddings_async(text: str, embeddings_client):
-    """Get embeddings using async EmbeddingsClient."""
+    """Get embeddings using async AzureOpenAI client."""
     try:
-        resp = await embeddings_client.embed(model=EMBEDDING_MODEL, input=[text])
+        resp = await embeddings_client.embeddings.create(model=EMBEDDING_MODEL, input=[text])
         return resp.data[0].embedding
     except Exception as e:
         print(f"Error getting embeddings: {e}")
@@ -380,10 +384,13 @@ async def process_files():
     # Create embeddings client for entire processing session
     async with (
         AsyncAzureCliCredential(process_timeout=30) as async_cred,
-        EmbeddingsClient(
-            endpoint=inference_endpoint,
-            credential=async_cred,
-            credential_scopes=["https://ai.azure.com/.default"],
+        AsyncAzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION,
+            azure_ad_token_provider=get_bearer_token_provider(
+                AzureCliCredential(process_timeout=30),
+                "https://cognitiveservices.azure.com/.default",
+            ),
         ) as embeddings_client
     ):
         ANALYZER_ID = "ckm-json"

@@ -20,7 +20,7 @@ logging.getLogger("agent_framework.azure").setLevel(logging.ERROR)
 
 import pandas as pd
 import pyodbc
-from azure.ai.inference.aio import EmbeddingsClient
+from openai import AsyncAzureOpenAI
 from azure.ai.projects.aio import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
 from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
@@ -203,15 +203,20 @@ cu_client = AzureContentUnderstandingClient(
 )
 ANALYZER_ID = "ckm-json"
 
-# Azure AI Foundry (Inference) embeddings client (async)
-inference_endpoint = f"https://{urlparse(AI_PROJECT_ENDPOINT).netloc}/models"
+# Azure OpenAI embeddings endpoint derived from the AI Foundry account hostname
+# (Foundry account `<acct>.services.ai.azure.com` exposes Azure OpenAI deployments
+# at `<acct>.openai.azure.com`). The Foundry Inference (`/models`) router does
+# NOT serve AOAI deployments and returns an empty body.
+_aoai_host = urlparse(AI_PROJECT_ENDPOINT).netloc.split('.', 1)[0]
+AZURE_OPENAI_ENDPOINT = f"https://{_aoai_host}.openai.azure.com"
+AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
 
 
 # Utility functions
 async def get_embeddings_async(text: str, embeddings_client):
-    """Get embeddings using async EmbeddingsClient."""
+    """Get embeddings using async AzureOpenAI client."""
     try:
-        resp = await embeddings_client.embed(model=EMBEDDING_MODEL, input=[text])
+        resp = await embeddings_client.embeddings.create(model=EMBEDDING_MODEL, input=[text])
         return resp.data[0].embedding
     except Exception as e:
         print(f"Error getting embeddings: {e}")
@@ -326,10 +331,13 @@ async def process_files():
     # Create embeddings client for entire processing session
     async with (
         AsyncAzureCliCredential(process_timeout=30) as async_cred,
-        EmbeddingsClient(
-            endpoint=inference_endpoint,
-            credential=async_cred,
-            credential_scopes=["https://ai.azure.com/.default"],
+        AsyncAzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION,
+            azure_ad_token_provider=get_bearer_token_provider(
+                AzureCliCredential(process_timeout=30),
+                "https://cognitiveservices.azure.com/.default",
+            ),
         ) as embeddings_client
     ):
         for path in paths:
