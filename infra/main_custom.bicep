@@ -1276,7 +1276,7 @@ var reactAppLayoutConfig = '''{
     },
     {
       "id": "SENTIMENT",
-      "name": "Topics Overview",
+      "name": "Sentiment overview",
       "type": "donutchart",
       "layout": { "row": 2, "column": 1, "width": 40, "height": 44.5 }
     },
