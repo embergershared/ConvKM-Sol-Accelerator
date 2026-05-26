@@ -17,6 +17,7 @@ param solutionName string = 'kmgen'
   'northeurope'
   'southeastasia'
   'uksouth'
+  'swedencentral'
 ])
 param location string
 
@@ -185,6 +186,7 @@ var replicaRegionPairs = {
   southeastasia: 'eastasia'
   uksouth: 'westeurope'
   westeurope: 'northeurope'
+  swedencentral: 'northeurope'
 }
 var replicaLocation = replicaRegionPairs[resourceGroup().location]
 
@@ -200,6 +202,7 @@ var cosmosDbZoneRedundantHaRegionPairs = {
   southeastasia: 'eastasia'
   uksouth: 'westeurope'
   westeurope: 'northeurope'
+  swedencentral: 'northeurope'
 }
 // Paired location calculated based on 'location' parameter. This location will be used by applicable resources if `enableScalability` is set to `true`
 var cosmosDbHaLocation = cosmosDbZoneRedundantHaRegionPairs[resourceGroup().location]
