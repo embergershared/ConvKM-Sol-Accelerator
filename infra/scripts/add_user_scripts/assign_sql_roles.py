@@ -33,27 +33,36 @@ def client_id_to_sid(client_id: str) -> str:
 def connect_with_token(server: str, database: str, credential: AzureCliCredential):
     """
     Connect to SQL Server using Azure CLI credential token.
-    
-    Args:
-        server: SQL Server fully qualified name
-        database: Database name
-        credential: Azure CLI credential for authentication
-        
-    Returns:
-        pyodbc.Connection: Database connection object
-        
-    Raises:
-        RuntimeError: If unable to connect with available ODBC drivers
+
+    Tries ODBC Driver 18 then 17. If a driver is genuinely missing the loader
+    raises an "IM002" / "file not found" error and we silently fall through to
+    the next driver. Any other pyodbc error (auth failure, network ACL deny,
+    firewall block, etc.) is preserved and re-raised so the operator sees the
+    real cause instead of a misleading "install drivers" message.
     """
     token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("utf-16-le")
     token_struct = struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
+    last_real_error: Exception | None = None
+    drivers_missing: list[str] = []
     for driver in ["{ODBC Driver 18 for SQL Server}", "{ODBC Driver 17 for SQL Server}"]:
+        conn_str = f"DRIVER={driver};SERVER={server};DATABASE={database};"
         try:
-            conn_str = f"DRIVER={driver};SERVER={server};DATABASE={database};"
             return pyodbc.connect(conn_str, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct})
-        except pyodbc.Error:
-            continue
-    raise RuntimeError("Unable to connect using ODBC Driver 18 or 17. Install driver msodbcsql17/18.")
+        except pyodbc.Error as e:
+            msg = str(e)
+            # Driver Manager couldn't load the driver shared library: try next.
+            if "file not found" in msg.lower() or "im002" in msg.lower():
+                drivers_missing.append(driver)
+                continue
+            # Real failure (auth, ACL, firewall, etc.) — keep it and stop trying.
+            last_real_error = e
+            break
+    if last_real_error is not None:
+        raise last_real_error
+    raise RuntimeError(
+        f"Unable to connect: required ODBC drivers not installed ({', '.join(drivers_missing)}). "
+        "Install msodbcsql17 or msodbcsql18."
+    )
 
 
 def assign_sql_roles(server, database, roles_json):
