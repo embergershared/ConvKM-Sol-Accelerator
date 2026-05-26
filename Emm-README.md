@@ -284,3 +284,8 @@ az webapp config container set \
 
 az webapp restart -g "$RG" -n "$API_APP"
 ```
+
+## Samples questions
+
+https://github.com/embergershared/ConvKM-Sol-Accelerator/blob/main/documents/SampleQuestions.md
+
