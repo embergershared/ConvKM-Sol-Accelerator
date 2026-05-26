@@ -11,7 +11,7 @@ API_APP=api-iter01l2yhy
 IMAGE_API=sc-ccanalysis-api
 ```
 
-## Update the Web App:
+## Update the Web App
 
 ```bash
 cd src/App
@@ -22,7 +22,7 @@ az webapp restart -g "$RG" -n "$APP"
 cd ../..
 ```
 
-## Update the API backend:
+## Update the API backend
 
 ```bash
 cd src/api
