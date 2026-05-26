@@ -14,3 +14,7 @@
 /myenv
 scriptenv/
 __pycache__/
+
+# Local sample data and generated SQL/JSON outputs (added in deployment-fixes)
+call_transcripts/
+infra/scripts/index_scripts/sql_files/
