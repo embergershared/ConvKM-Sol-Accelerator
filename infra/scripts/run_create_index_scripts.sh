@@ -186,6 +186,22 @@ if [ -n "$backendManagedIdentityClientId" ] && [ -n "$backendManagedIdentityDisp
 
     if [ -f "$SCRIPT_DIR/add_user_scripts/assign_sql_roles.py" ]; then
         echo "✓ Assigning SQL roles to managed identity"
+        # Make sure SQL Server public network access is enabled. process_sample_data.sh
+        # turns it on at startup, but the AVM SQL module / azd provision can flip it
+        # back to Disabled, and the change can take a few seconds to propagate.
+        current_sql_public=$(az sql server show \
+            --name "$sqlServerName" \
+            --resource-group "$resourceGroupName" \
+            --query "publicNetworkAccess" -o tsv 2>/dev/null)
+        if [ "$current_sql_public" != "Enabled" ]; then
+            echo "  · Re-enabling SQL public network access (was: ${current_sql_public:-unknown})"
+            az sql server update \
+                --name "$sqlServerName" \
+                --resource-group "$resourceGroupName" \
+                --enable-public-network true \
+                --output none
+            sleep 15
+        fi
         python "$SCRIPT_DIR/add_user_scripts/assign_sql_roles.py" --server "$server_fqdn" --database "$sqlDatabaseName" --roles-json "$roles_json"
         if [ $? -ne 0 ]; then
             echo "⚠ SQL role assignment failed"
