@@ -64,3 +64,29 @@
 - v1 scope instructions-only (no model picker, no version history); v2 scopes on SDK (now resolved).
 - 6 decisions merged; 6 orchestration logs; session log created.
 - Implementation ready on v1 scope immediately.
+
+### 2026-06-01 — v1 Backend Implementation Shipped
+
+**Files created:**
+- `src/api/services/agent_definition.py` — pure function, no Config import, 9 parity invariants documented in docstring.
+- `src/api/services/agent_admin_service.py` — wraps `AIProjectClient` (azure.ai.projects.aio). Constructor takes `project_client`, `agent_name`, `chat_service`. `get_current()` calls `agents.get(name)` → `AgentDetails.versions.latest`. `publish()` pre-flight checks expected version, calls `create_version`, clears thread cache, tracks telemetry.
+- `src/api/api/admin_auth.py` — `require_admin_auth` FastAPI dependency. Returns publisher string. Bypasses on `ADMIN_AUTH_BYPASS=true`.
+- `src/api/api/admin_routes.py` — `GET /agent` and `PUT /agent` under `/api/admin` prefix. Idempotency cache (module-level dict, 60s TTL). Secret-pattern scan (non-blocking, warning in response). No rate-limit lib present → TODO comment added.
+
+**Files modified:**
+- `src/api/app.py` — included admin router at `/api/admin`.
+- `infra/scripts/agent_scripts/01_create_agents.py` — replaced inline tool construction with `build_conversation_agent_tools(...)`, added `sys.path.append` for `src/api/services/`.
+
+**Key discovery:**
+- `ChatService.get_thread_cache()` already existed (line 112) — no new helper needed.
+- `AgentVersionDetails.id` is the version ID field (not `version_id`).
+- Hicks' `agent_version_factory` sets `.version_id` on mocks but service reads `.id`. Potential test field-name mismatch flagged in decisions inbox.
+- Baseline pytest tests were already failing due to pytest venv azure namespace conflict (pre-existing, confirmed on clean branch HEAD).
+
+### 2026-06-01 — v1 Implementation Complete — Reviewer APPROVE WITH NITS
+
+- **Ripley's verdict:** APPROVE WITH NITS — all 7 acceptance criteria pass; all plan-required guarantees met; 196 backend + 11 frontend tests green (zero regressions).
+- **Team composition:** parker-2 backend + lambert-1 frontend + hicks-1 tests (initial) + hicks-2 tests (reconciliation) + ripley-3 review + lambert-2 docs.
+- **Key achievements:** Correct SDK client (AIProjectClient.agents, not AgentsClient); concurrency control via expected_version_id + 409; thread cache invalidation; auth gate (x-ms-client-principal-id required); 9 parity invariants locked by tests; process-local cache/idempotency documented with v2 debt.
+- **Nits (polish-only):** Remove unused asynccontextmanager import; add ChatService comment; update parity docstring count.
+

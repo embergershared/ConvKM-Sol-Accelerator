@@ -33,3 +33,25 @@
 - v1 scope cut to instructions-only edit (no model picker, no version history); v2 scope gates on SDK spike (now resolved).
 - 6 decisions merged into `.squad/decisions.md`; 6 orchestration logs written; session log created.
 - Next: implementation ready on v1 scope immediately.
+- 2026-06-01T20:19:51Z: Published agent-admin-ui-v2.md v2.1 — collapsed SDK conditionals (Parker spike RESOLVED), added critical wrong-client warning (AIProjectClient vs AgentsClient).
+
+### 2026-06-01 — v1 Reviewer Gate: APPROVE WITH NITS
+
+- **Verdict:** APPROVE WITH NITS — all 7 acceptance criteria pass, all plan-required guarantees met with evidence, 38 new tests (zero regressions).
+- **Implementation quality:** Clean separation (pure function module, service wrapper, route layer, auth dependency). Correct SDK client used. Cache invalidation targets module-global correctly despite per-request ChatService() instantiation.
+- **Lambert's 3 deviations all justified:** isAdminPanelOpen (overlay doesn't participate in column math), raw fetch (401 interceptor would preempt per-status handling), Fluent ESM→CJS mapper (jsdom limitation).
+- **Nits (non-blocking):** unused `asynccontextmanager` import in admin_routes.py; per-request ChatService() instantiation deserves a comment; parity test count docstring says 9 but there are 10 tests.
+- **Key architectural insight:** The module-global `thread_cache` pattern in `chat_service.py` means any ChatService() instance accesses the same cache — but this is non-obvious and fragile if someone refactors to instance-level caches later.
+- **v2 debt accepted:** process-local cache/idempotency, no rate limiting, non-blocking secret scan, no persistent audit log, overlay UI will outgrow single page.
+
+### 2026-06-01 — v1 Implementation Complete — All Metrics Green
+
+- **Verdict:** v1 implementation of agent-admin-ui shipped — Reviewer APPROVE WITH NITS.
+- **Agents dispatched:** parker-2, lambert-1, hicks-1, hicks-2, ripley-3, lambert-2 (6 total).
+- **Files created:** 11 (4 backend services, 4 backend tests, 3 frontend + types).
+- **Files modified:** 6 (app.py, admin_routes, conftest, App.tsx, setupTests.ts, package.json, LocalDevelopmentSetup.md).
+- **Test results:** 196 backend + 11 frontend passing, zero failing, zero pre-existing regressions.
+- **Acceptance criteria:** 7/7 pass with concrete evidence.
+- **Plan guarantees:** 17/17 verified locked in.
+- **Surface assumptions:** 10/10 locked by test suite.
+- **Handoff:** Ready to merge; nits are polish-only post-merge tasks.

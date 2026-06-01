@@ -27,3 +27,24 @@
 - v1 scope instructions-only; v2 scope gates on SDK (now confirmed).
 - 6 decisions merged; orchestration/session logs created.
 - Implementation ready on v1 scope.
+
+### 2026-06-01 — v1 Frontend implementation shipped
+
+- **Files created:** `src/App/src/types/AgentAdmin.ts`, `src/App/src/api/adminApi.ts`, `src/App/src/components/Admin/AgentAdmin.tsx`, `src/App/src/components/Admin/AgentAdmin.test.tsx`.
+- **Files modified:** `src/App/src/App.tsx` (ADMIN panel, gear icon, focus management), `src/App/src/setupTests.ts` (fetch mock + ResizeObserver mock), `src/App/package.json` (Jest moduleNameMapper for Fluent v9 ESM).
+- **Panel approach:** Used a separate `isAdminPanelOpen` boolean state in App.tsx instead of adding ADMIN to `panelShowStates`. This avoids the column-width layout calculation counting the admin overlay as an open panel. `ADMIN: "ADMIN"` was added to the `panels` const for naming only.
+- **Unsaved-changes prompt:** Fluent v9 `Dialog` shown when `handleClose` is called with `hasUnsavedChanges === true`. `beforeunload` event listener also attached while there are unsaved changes.
+- **adminApi.ts uses raw `fetch`** (not httpClient) because httpClient's 401 interceptor throws before we can inspect the status — we need per-status control for all error paths.
+- **Jest fix required:** `@fluentui/react-icons/lib/providers.js` is ESM and is required transitively by `@fluentui/react-provider` (CJS). Added `moduleNameMapper` in package.json to redirect to the CJS build at `lib-cjs/`. Also mocked `ResizeObserver` in setupTests.ts — jsdom omits it but Fluent v9 MessageBar references it.
+- **All 11 RTL tests pass.** Baseline App.test.tsx also passes unchanged.
+
+### 2026-06-01 — Updated LocalDevelopmentSetup.md with Agent Admin Panel section
+
+- Added `## Agent Admin Panel` section to documents/LocalDevelopmentSetup.md before Troubleshooting; covers feature overview, visibility toggle (REACT_APP_SHOW_ADMIN env var + ?admin=1 query param), authentication (x-ms-client-principal-id header + ADMIN_AUTH_BYPASS bypass), 60-minute cache propagation caveat, required env vars (AZURE_AI_AGENT_ENDPOINT, AGENT_NAME_CONVERSATION), and v2 feature roadmap (model picker, version history, rollback, diff preview).
+
+### 2026-06-01 — v1 Implementation Complete — Reviewer APPROVE WITH NITS
+
+- **Ripley's verdict:** APPROVE WITH NITS — all 7 acceptance criteria pass; all plan-required guarantees met; 196 backend + 11 frontend tests green (zero regressions).
+- **Team composition:** parker-2 backend + lambert-1 frontend + hicks-1 tests (initial) + hicks-2 tests (reconciliation) + ripley-3 review + lambert-2 docs.
+- **Key achievements:** Correct SDK client (AIProjectClient.agents, not AgentsClient); concurrency control via expected_version_id + 409; thread cache invalidation; auth gate (x-ms-client-principal-id required); 9 parity invariants locked by tests; process-local cache/idempotency documented with v2 debt.
+- **Nits (polish-only):** Remove unused asynccontextmanager import; add ChatService comment; update parity docstring count.
