@@ -1,2 +1,7 @@
 # Ensure shell scripts always use LF line endings, even on Windows checkouts.
 *.sh text eol=lf
+# Squad: union merge for append-only team state files
+.squad/decisions.md merge=union
+.squad/agents/*/history.md merge=union
+.squad/log/** merge=union
+.squad/orchestration-log/** merge=union
