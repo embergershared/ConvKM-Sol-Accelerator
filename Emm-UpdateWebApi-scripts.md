@@ -42,7 +42,19 @@ $ACR = "acrsccanalysisit01"
 $APP = "app-iter01l2yhy"
 $IMAGE_WEB = "sc-ccanalysis-web"
 $API_APP = "api-iter01l2yhy"
-$IMAGE_API = "sc-ccanalysis-api"$
+$IMAGE_API = "sc-ccanalysis-api"
+
+```
+
+## Update the API backend
+
+```powershell
+Set-Location src/api
+$TAG_API = "custom-$(Get-Date -Format 'yyyyMMdd-HHmm')"
+az acr build -r $ACR -t "${IMAGE_API}:${TAG_API}" -f ApiApp.Dockerfile .
+az webapp config container set -g $RG -n $API_APP --container-image-name "$ACR.azurecr.io/${IMAGE_API}:${TAG_API}"
+az webapp restart -g $RG -n $API_APP
+Set-Location ../..
 
 ```
 
@@ -58,14 +70,4 @@ Set-Location ../..
 
 ```
 
-## Update the API backend
 
-```powershell
-Set-Location src/api
-$TAG_API = "custom-$(Get-Date -Format 'yyyyMMdd-HHmm')"
-az acr build -r $ACR -t "${IMAGE_API}:${TAG_API}" -f ApiApp.Dockerfile .
-az webapp config container set -g $RG -n $API_APP --container-image-name "$ACR.azurecr.io/${IMAGE_API}:${TAG_API}"
-az webapp restart -g $RG -n $API_APP
-Set-Location ../..
-
-```
