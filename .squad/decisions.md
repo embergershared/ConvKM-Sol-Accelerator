@@ -392,6 +392,33 @@ Minimum additional RTL test cases:
 
 ---
 
+## 2026-06-07 Session: Multi-model Foundry Support
+
+### Decision 1: Model Registry Architecture (Parker, 2026-06-07)
+**Status:** IMPLEMENTED — Multi-model chat routing enabled
+
+**Decision:**
+1. Introduce backend `ModelRegistry` (`src/api/common/config/model_registry.py`) sourced from `FOUNDRY_MODEL_REGISTRY` env var
+2. Preserve backward compatibility by synthesizing single `default` model from `AGENT_NAME_CONVERSATION` when registry env var absent
+3. Scope Foundry thread cache entries by `conversation_id:model_id-or-default` to prevent cross-model cache collision
+4. Validate optional `model` request field at API boundary; expose public `GET /models` endpoint returning `id`, `display_name`, `is_default`
+
+**Why:** Without model-aware registry and cache key, two chat requests for same conversation could reuse Foundry thread across different agent deployments. Keeps single-model deployments unchanged while enabling safe frontend model discovery.
+
+---
+
+### Decision 2: Multi-model Test Structure (Hicks, 2026-06-07)
+**Status:** IMPLEMENTED — Test coverage split by responsibility
+
+**Decision:** Keep multi-model coverage split by responsibility:
+- Env/config contract in `tests/test_model_registry.py`
+- Service behavior in `src/tests/api/services/test_chat_service.py`
+- HTTP contract in `src/tests/api/api/test_api_routes.py`
+
+**Why:** Matches existing pytest layout, keeps mocks at boundary, makes parity drift obvious when registry parsing, agent selection, cache-keying, or route validation changes independently. `ModelRegistry.list_models()` treated as public-safe shape; agent-name resolution asserted through `get_agent_name()` and ChatService call assertions.
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
