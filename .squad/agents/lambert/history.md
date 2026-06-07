@@ -9,6 +9,24 @@
 
 ## Learnings
 
+### 2026-06-07T00:57:20.783+00:00 — Chat model dropdown completed
+
+**Status:** Shipped + Orchestration logged
+
+- Model selector Dropdown added to `Chat.tsx` header using Fluent UI v9 with state in `appSlice`
+- Selection persists across `startNewConversation()`; fallback to `is_default: true` model or first model if selection no longer available
+- `useChatApi` forwards selected model on chat and follow-up requests
+- Frontend build + 12 tests passed
+- Decision entry merged to squad/decisions.md
+- **Files:** Chat.tsx, appSlice.ts, useChatApi.ts, api.ts, Chat.css, AppTypes.ts
+- Prerequisite: backend `GET /api/models` returns `{id, display_name, is_default}` shape (implemented upstream)
+
+### 2026-06-07T00:57:20.783+00:00 — Chat model selector shipped
+
+- Added a Foundry model picker to `Chat.tsx` using Fluent UI v9 `Dropdown` + `Option`, with state stored in `appSlice` so the selection survives `startNewConversation()`.
+- `appSlice.fetchModels` now hydrates `availableModels` from `GET /api/models` and preserves any still-valid selection; otherwise it falls back to the API model marked `is_default: true` (or the first returned model).
+- `useChatApi` now forwards the selected `model` on both normal chat requests and automatic chart follow-up requests so the whole conversation flow stays on the chosen deployment.
+
 ### 2026-06-01 — Frontend review of `plans/agent-admin-ui.md`
 
 - **No router in this project.** `package.json` has no `react-router-dom`. The existing navigation pattern in `App.tsx` is a `panelShowStates` boolean map. A hash route requires manual `window.location.hash` listening — zero framework support. The plan's preference for `#/admin` conflicts with established convention; a simple `showAdmin: boolean` state fits the codebase perfectly.

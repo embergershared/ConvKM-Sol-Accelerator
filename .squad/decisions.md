@@ -419,6 +419,17 @@ Minimum additional RTL test cases:
 
 ---
 
+### Decision 3: Model Dropdown Persistence (Lambert, 2026-06-07)
+**Status:** IMPLEMENTED — Frontend model selection retained across sessions
+
+**Decision:** Store selected Foundry model in shared `app` Redux slice; preserve across `startNewConversation()` resets. When `/api/models` refreshes, keep current selection if available; otherwise fall back to model flagged `is_default: true`, or first model if no default.
+
+**Why:** Remember model choice during active session; resetting on every conversation creates UX surprise. Fallback rule keeps UI resilient when backend changes available deployment list between refreshes.
+
+**Files:** `src/App/src/state/slices/appSlice.ts`, `src/App/src/components/Chat/Chat.tsx`, `src/App/src/hooks/useChatApi.ts`
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
