@@ -11,6 +11,7 @@ Follow instructions from
 1. Switch to Dev Container
 
 
+2. Authenticate AZD to Azure
 
 azd auth login
 azd config set provision.preflight off
@@ -237,6 +238,17 @@ API_APP=$(azd env get-value API_APP_NAME)
 IMAGE_API=sc-ccanalysis-api
 ```
 
+```pwsh
+$RG = azd env get-value RESOURCE_GROUP_NAME
+$ACR = "acr$(azd env get-value SOLUTION_NAME)"
+# Control
+Write-Host $ACR
+$APP = "app-$(azd env get-value SOLUTION_NAME)"
+$IMAGE_WEB = "sc-ccanalysis-web"
+$API_APP = azd env get-value API_APP_NAME
+$IMAGE_API = "sc-ccanalysis-api"
+```
+
 #### Create an ACR
 
 ```bash
@@ -282,14 +294,19 @@ az role assignment create \
 #### Create Image of the WebApp and make it used
 ```bash
 cd src/App
-# Remove local node_modules before upload. The Dockerfile runs `npm ci` inside the
-# image, so the host copy is unused — and azure-cli's archiver walks every file
-# under node_modules even when .dockerignore excludes it (only `.venv` gets a
-# hardcoded skip-recursion fast-path in azure/cli/command_modules/acr/_archive_utils.py).
-# rm -rf node_modules
 TAG_WEB=iter02-$(date +%Y%m%d-%H%M)
+rm -rf node_modules
 az acr build -r "$ACR" -t "$IMAGE_WEB:$TAG_WEB" -f WebApp.Dockerfile .
 az webapp config container set -g "$RG" -n "$APP" --container-image-name "$ACR.azurecr.io/$IMAGE_WEB:$TAG_WEB"
+az webapp restart -g "$RG" -n "$APP"
+cd ../..
+```
+
+```pwsh
+cd src/App
+$TAG_WEB = "iter02-$(Get-Date -Format 'yyyyMMdd-HHmm')"
+az acr build -r "$ACR" -t "${IMAGE_WEB}:$TAG_WEB" -f WebApp.Dockerfile .
+az webapp config container set -g "$RG" -n "$APP" --container-image-name "$ACR.azurecr.io/${IMAGE_WEB}:$TAG_WEB"
 az webapp restart -g "$RG" -n "$APP"
 cd ../..
 ```

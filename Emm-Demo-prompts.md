@@ -11,7 +11,7 @@
 `Show average handling time by topics in minutes, sorted by the longest to the shortest.`
 
 
-`Generate a chart showing sentiment changes per day for last 7 days.`
+`Generate a lines chart showing sentiment changes per day for last 7 days.`
 
 
 `What are top 3 challenges user reported.`
