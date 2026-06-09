@@ -257,7 +257,7 @@ const Dashboard: React.FC = () => {
         <div className="header-left-section">
           <AppLogo />
           <Subtitle2>
-            Woodgrove <Body2 style={{ gap: "10px" }}>| Call Analysis</Body2>
+            Southern Company <Body2 style={{ gap: "10px" }}>| Customer Calls Sentiment Analysis</Body2>
           </Subtitle2>
         </div>
         <div className="header-right-section">
@@ -265,9 +265,8 @@ const Dashboard: React.FC = () => {
             appearance="subtle"
             onClick={() => onHandlePanelStates(panels.DASHBOARD)}
           >
-            {`${
-              panelShowStates[panels.DASHBOARD] ? "Hide" : "Show"
-            } Dashboard`}
+            {`${panelShowStates[panels.DASHBOARD] ? "Hide" : "Show"
+              } Dashboard`}
           </Button>
           <Button
             icon={<SparkleRegular />}

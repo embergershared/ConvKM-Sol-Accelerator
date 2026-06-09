@@ -235,7 +235,7 @@ async def fetch_chart_data(chart_filters: ChartFilters = ''):
                 round((CAST(SUM(CASE WHEN satisfied = 'yes' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100), 2) as value, '%' as unit_of_measurement from [dbo].[processed_data]
                 {where_clause}
                 union all
-                select 'SENTIMENT' as id, 'Topics Overview' as chart_name, 'donutchart' as chart_type,
+                select 'SENTIMENT' as id, 'Sentiment overview' as chart_name, 'donutchart' as chart_type,
                 sentiment as name,
                 (count(sentiment) * 100 / sum(count(sentiment)) over ()) as value,
                 '' as unit_of_measurement from [dbo].[processed_data]  {where_clause}
