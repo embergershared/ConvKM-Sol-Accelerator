@@ -3,6 +3,18 @@
 This file captures the additional steps performed on top of the standard
 [`README.md`](./README.md) deployment instructions. Run them in order.
 
+Deploy from scratch
+
+azd auth login
+azd config set provision.preflight off
+
+azd env new iter02 --location swedencentral --subscription 4c88693f-5cc9-4f30-9d1e-d58d4221cf25 --set-default
+
+azd up
+
+
+
+
 ---
 
 ## 1. Fix CRLF line endings on shell scripts
