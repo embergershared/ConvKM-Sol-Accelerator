@@ -4,6 +4,7 @@ import chatReducer from "./slices/chatSlice";
 import citationReducer from "./slices/citationSlice";
 import chatHistoryReducer from "./slices/chatHistorySlice";
 import dashboardReducer from "./slices/dashboardSlice";
+import drillReducer from "./slices/drillSlice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     chat: chatReducer,
     citation: citationReducer,
     chatHistory: chatHistoryReducer,
+    drill: drillReducer,
   },
   devTools: process.env.NODE_ENV !== "production",
 });

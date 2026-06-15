@@ -12,6 +12,7 @@ interface DonutChartProps {
   containerHeight: number;
   widthInPixels: number;
   containerID: string;
+  onSliceClick?: (label: string) => void;
 }
 
 const DonutChart: React.FC<DonutChartProps> = ({
@@ -19,6 +20,7 @@ const DonutChart: React.FC<DonutChartProps> = ({
   title,
   containerHeight,
   containerID,
+  onSliceClick,
 }) => {
   const chartRef = useRef<SVGSVGElement | null>(null);
   const [centerText, setCenterText] = useState({
@@ -76,16 +78,26 @@ const DonutChart: React.FC<DonutChartProps> = ({
       .data(pie(data))
       .enter()
       .append("path")
-      .attr("class", "arc")
+      .attr("class", "arc drill-mark")
       .attr("d", arc)
       .attr("fill", (d: any) => d.data.color)
       .style("cursor", "pointer")
+      .attr("role", "button")
+      .attr("tabindex", 0)
+      .attr("aria-label", (d: any) => `Drill into sentiment ${d.data.label}`)
       .on("click", (event, d) => {
         const percentage = (
           (d.data.value / d3.sum(data, (d) => d.value)) *
           100
         ).toFixed(0);
         setCenterText({ label: d.data.label, percentage });
+        onSliceClick?.(d.data.label);
+      })
+      .on("keydown", (event: any, d: any) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSliceClick?.(d.data.label);
+        }
       });
 
     return () => {
@@ -93,7 +105,7 @@ const DonutChart: React.FC<DonutChartProps> = ({
         d3.select(chartElement).selectAll("*").remove();
       }
     };
-  }, [data, containerHeight, containerID]);
+  }, [data, containerHeight, containerID, onSliceClick]);
 
   return (
     <div style={styles.container}>

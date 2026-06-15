@@ -17,12 +17,14 @@ interface TopicTableProps {
   columnKeys: string[];
   rows: { [key: string]: string | number }[];
   containerHeight: number;
+  onRowClick?: (row: { [key: string]: string | number }) => void;
 }
 
 const TopicTable: React.FC<TopicTableProps> = ({
   columns,
   rows,
   columnKeys,
+  onRowClick,
 }) => {
   return (
     <div
@@ -53,7 +55,20 @@ const TopicTable: React.FC<TopicTableProps> = ({
         </TableHeader>
         <TableBody style={{ overflowY: "auto",  maxHeight: "calc(91% - 50px)", width: "100%" }}>
           {rows.map((row, index) => (
-            <TableRow key={index}>
+            <TableRow
+              key={index}
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              aria-label={onRowClick ? `Drill into topic ${row["name"]}` : undefined}
+              onClick={() => onRowClick?.(row)}
+              onKeyDown={(e) => {
+                if (onRowClick && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onRowClick(row);
+                }
+              }}
+              style={{ cursor: onRowClick ? "pointer" : "default" }}
+            >
               {columnKeys.map((columnKey) => (
                 <TableCell key={columnKey} style={tableStyles.cell}>
                   <TableCellLayout>

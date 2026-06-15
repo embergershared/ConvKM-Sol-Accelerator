@@ -119,6 +119,10 @@ history_router = _safe_import(
     "api.history_routes",
     lambda: __import__("api.history_routes", fromlist=["router"]).router,
 )
+drill_router = _safe_import(
+    "api.drill_routes",
+    lambda: __import__("api.drill_routes", fromlist=["router"]).router,
+)
 
 configure_azure_monitor = _safe_import(
     "azure.monitor.opentelemetry",
@@ -217,6 +221,7 @@ def build_app() -> "FastAPI":
 
     fastapi_app.include_router(backend_router, prefix="/api", tags=["backend"])
     fastapi_app.include_router(history_router, prefix="/history", tags=["history"])
+    fastapi_app.include_router(drill_router, prefix="/api/drill", tags=["drill"])
 
     @fastapi_app.get("/health")
     async def health_check():

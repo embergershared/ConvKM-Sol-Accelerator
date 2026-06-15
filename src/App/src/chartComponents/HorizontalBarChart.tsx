@@ -7,6 +7,7 @@ interface BarChartProps {
   yLabel?: string;
   containerHeight: number;
   containerID: string;
+  onBarClick?: (category: string) => void;
 }
 
 interface DataWithFullCategoryText {
@@ -21,6 +22,7 @@ const BarChart: React.FC<BarChartProps> = ({
   yLabel,
   containerHeight,
   containerID,
+  onBarClick,
 }) => {
   const chartRef = useRef<SVGSVGElement>(null);
 
@@ -109,7 +111,7 @@ const BarChart: React.FC<BarChartProps> = ({
       .data(modifiedData)
       .enter()
       .append("rect")
-      .attr("class", "bar")
+      .attr("class", "bar drill-mark")
       .attr("x", 0)
       .attr("y", (d) => y(d.category)!)
       .attr("width", (d) => x(d.value))
@@ -117,6 +119,10 @@ const BarChart: React.FC<BarChartProps> = ({
       .attr("fill", (d) => colorScale(d.value)) 
       .attr("rx", 8)
       .attr("ry", 8)
+      .attr("role", "button")
+      .attr("tabindex", 0)
+      .attr("aria-label", (d) => `Drill into topic ${d.fullCategoryText}`)
+      .style("cursor", onBarClick ? "pointer" : "default")
       .on("mouseover", (event, d) => {
         tooltip
           .style("display", "block")
@@ -129,6 +135,15 @@ const BarChart: React.FC<BarChartProps> = ({
       })
       .on("mouseout", () => {
         tooltip.style("display", "none");
+      })
+      .on("click", (_event, d) => {
+        onBarClick?.(d.fullCategoryText);
+      })
+      .on("keydown", (event: any, d) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onBarClick?.(d.fullCategoryText);
+        }
       });
 
     if (yLabel) {
@@ -142,7 +157,7 @@ const BarChart: React.FC<BarChartProps> = ({
         .style("font-size", "12px")
         .text(yLabel);
     }
-  }, [containerHeight, containerID, data, title, yLabel]);
+  }, [containerHeight, containerID, data, title, yLabel, onBarClick]);
 
   return (
     <div style={{ height: "91%" }}>

@@ -15,6 +15,7 @@ interface WordCloudChartProps {
   title: string;
   containerHeight: number;
   widthInPixels: number;
+  onWordClick?: (text: string) => void;
 }
 
 const WordCloudChart: React.FC<WordCloudChartProps> = ({
@@ -22,6 +23,7 @@ const WordCloudChart: React.FC<WordCloudChartProps> = ({
   title,
   containerHeight,
   widthInPixels = 300,
+  onWordClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({
@@ -127,17 +129,31 @@ const WordCloudChart: React.FC<WordCloudChartProps> = ({
         .data(words)
         .enter()
         .append("text")
+        .attr("class", "drill-mark")
         .style("font-size", (d) => `${d.size}px`)
         .style("fill", (d) => d.color || "#69b3a2")
+        .style("cursor", onWordClick ? "pointer" : "default")
         .attr("text-anchor", "middle")
+        .attr("role", onWordClick ? "button" : null)
+        .attr("tabindex", onWordClick ? 0 : null)
+        .attr("aria-label", (d) =>
+          onWordClick ? `Drill into key phrase ${d.text}` : null
+        )
         .attr(
           "transform",
           (d) =>
             `translate(${d.x + padding}, ${d.y + padding}) rotate(${d.rotate})`
         )
-        .text((d) => d.text);
+        .text((d) => d.text)
+        .on("click", (_event, d: any) => onWordClick?.(d.text))
+        .on("keydown", (event: any, d: any) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onWordClick?.(d.text);
+          }
+        });
     }
-  }, [data.words, dimensions, wordsSignature]);
+  }, [data.words, dimensions, wordsSignature, onWordClick]);
 
   return (
     <div style={WordCloudStyles.mainContainer} ref={containerRef}>
