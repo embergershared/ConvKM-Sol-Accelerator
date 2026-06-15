@@ -49,21 +49,35 @@ async def get_db_connection():
         )
         SQL_COPT_SS_ACCESS_TOKEN = 1256
 
-        # Try both ODBC Driver 18 and 17
+        installed_drivers = pyodbc.drivers()
+        logging.info("Available ODBC drivers: %s", installed_drivers)
+
         conn = None
+        last_error: Exception | None = None
         for driver in ["{ODBC Driver 18 for SQL Server}", "{ODBC Driver 17 for SQL Server}"]:
+            driver_name = driver.strip("{}")
+            if driver_name not in installed_drivers:
+                logging.warning("Skipping %s: not installed in this container", driver_name)
+                continue
             try:
-                connection_string = f"DRIVER={driver};SERVER={server};DATABASE={database};"
+                connection_string = (
+                    f"DRIVER={driver};SERVER={server};DATABASE={database};"
+                    "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+                )
                 conn = pyodbc.connect(
                     connection_string, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct}
                 )
-                logging.info(f"Connected using Azure Credential with {driver}")
+                logging.info("Connected using Azure Credential with %s", driver)
                 return conn
-            except pyodbc.Error:
+            except pyodbc.Error as exc:
+                last_error = exc
+                logging.exception("pyodbc.connect failed with %s: %s", driver, exc)
                 continue
 
         if conn is None:
-            raise RuntimeError("Unable to connect using ODBC Driver 18 or 17 with Azure Credential")
+            raise RuntimeError(
+                "Unable to connect using ODBC Driver 18 or 17 with Azure Credential"
+            ) from last_error
         return conn
     except Exception as e:
         logging.error("Failed with Azure Credential: %s", str(e))
