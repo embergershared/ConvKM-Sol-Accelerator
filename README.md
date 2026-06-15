@@ -55,6 +55,9 @@ Azure OpenAI Service enables contextual question-answering, conversation capabil
 - **Actionable insights** <br/>  
 Summarized conversations, topic generation, and key phrase extraction support faster decision-making and improved productivity.
 
+- **Dashboard drill-down (Stage B)** <br/>
+Click any chart element — sentiment slice, topic bar, trending-topics row, or key-phrase word — to open a right-side overlay drawer that drills from a **time trend** to a **call list** to a **single transcript**. Keyboard-operable, breadcrumb + Esc navigation, resizable, with the drill state mirrored to `window.location.hash` for shareable links. See `plans/dashboard-drill-down.md` for the design and `infra/scripts/sqldb_drill_index.sql` for the optional supporting indexes.
+
 </details>
 
 
