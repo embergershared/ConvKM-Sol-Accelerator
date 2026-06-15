@@ -55,6 +55,9 @@ Azure OpenAI Service enables contextual question-answering, conversation capabil
 - **Actionable insights** <br/>  
 Summarized conversations, topic generation, and key phrase extraction support faster decision-making and improved productivity.
 
+- **Dashboard drill-down (Stage B)** <br/>
+Click any chart element — sentiment slice, topic bar, trending-topics row, or key-phrase word — to open a right-side overlay drawer that drills from a **time trend** to a **call list** to a **single transcript**. Keyboard-operable, breadcrumb + Esc navigation, resizable, with the drill state mirrored to `window.location.hash` for shareable links. See `plans/dashboard-drill-down.md` for the design and `infra/scripts/sqldb_drill_index.sql` for the optional supporting indexes.
+
 </details>
 
 
@@ -151,6 +154,18 @@ If the model change is initiated through the app you will see an amber
 **"Activating <model>…"** toast in the top-right corner of the page while
 Foundry provisions the new agent version (typically 1-2 minutes). The chat
 input is disabled until both agents report `status: "active"`.
+
+## Operational scripts
+
+Standalone SQL / Python scripts that are run **once after deployment** to
+enable or tune optional features. None of these are wired into the Bicep
+deployment — they are explicit, opt-in operator actions.
+
+| Script | Purpose | When to run | How to run |
+|---|---|---|---|
+| `infra/scripts/sqldb_drill_index.sql` | Adds two `NONCLUSTERED` indexes that keep the dashboard drill-down (L1 time trend, L2 call list) under 500 ms at sample-data scale. Idempotent. | Once, after enabling the Dashboard drill-down feature. Re-run after restoring a backup that did not include the indexes. | `sqlcmd -S <server>.database.windows.net -d <db> -U <user> -P <pwd> -i infra/scripts/sqldb_drill_index.sql` — or paste into Azure Data Studio / portal Query editor. |
+| `infra/scripts/agent_scripts/01_create_agents.py` | Creates the orchestrator + title agents in Foundry from `agent_instructions.py`. | First post-deploy, and after a portal change strips tools (see Guidance above). | See `infra/scripts/run_create_agents_scripts.sh`. |
+| `infra/scripts/agent_scripts/02_update_agents.py` | Re-publishes agent instructions while preserving the active model + tool bindings. | Whenever `agent_instructions.py` changes. | `python infra/scripts/agent_scripts/02_update_agents.py` |
 
 ## Resources
 

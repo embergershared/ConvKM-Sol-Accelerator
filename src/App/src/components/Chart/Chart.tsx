@@ -27,6 +27,8 @@ import {
   setFiltersMetaFetched,
   setInitialChartsDataFetched,
 } from "../../state/slices/dashboardSlice";
+import { openDrill } from "../../state/slices/drillSlice";
+import { trackDrillEvent } from "../../utils/drillTelemetry";
 import {
   ACCEPT_FILTERS,
   defaultSelectedFilters,
@@ -232,6 +234,20 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
               fallbackChartWidthInPixels
             }
             containerID={chart.domId}
+            onSliceClick={(label) => {
+              dispatch(
+                openDrill({
+                  selection: { dimension: "sentiment", value: label },
+                  bucket: "week",
+                })
+              );
+              trackDrillEvent("DrillOpened", {
+                dimension: "sentiment",
+                value: label,
+                level: "timeseries",
+                bucket: "week",
+              });
+            }}
           />
         ) : (
           <div
@@ -253,6 +269,20 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
             }))}
             containerHeight={heightInPixels}
             containerID={chart.domId}
+            onBarClick={(category) => {
+              dispatch(
+                openDrill({
+                  selection: { dimension: "topic", value: category },
+                  bucket: "week",
+                })
+              );
+              trackDrillEvent("DrillOpened", {
+                dimension: "topic",
+                value: category,
+                level: "timeseries",
+                bucket: "week",
+              });
+            }}
           />
         ) : (
           <div
@@ -275,6 +305,22 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
               average_sentiment: item.average_sentiment,
             }))}
             containerHeight={heightInPixels}
+            onRowClick={(row) => {
+              const value = String(row["name"] ?? "");
+              if (!value) return;
+              dispatch(
+                openDrill({
+                  selection: { dimension: "topic", value },
+                  bucket: "week",
+                })
+              );
+              trackDrillEvent("DrillOpened", {
+                dimension: "topic",
+                value,
+                level: "timeseries",
+                bucket: "week",
+              });
+            }}
           />
         ) : (
           <div
@@ -302,6 +348,20 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
               fallbackChartWidthInPixels
             }
             containerHeight={heightInPixels}
+            onWordClick={(text) => {
+              dispatch(
+                openDrill({
+                  selection: { dimension: "key_phrase", value: text },
+                  bucket: "week",
+                })
+              );
+              trackDrillEvent("DrillOpened", {
+                dimension: "key_phrase",
+                value: text,
+                level: "timeseries",
+                bucket: "week",
+              });
+            }}
           />
         ) : (
           <div

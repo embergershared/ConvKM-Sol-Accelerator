@@ -13,6 +13,14 @@ import {
   type ModelOption,
   type ModelStatus,
 } from "../types/AppTypes";
+import type {
+  CallDetail,
+  CallListItem,
+  DrillBucket,
+  DrillSelection,
+  DrillTimeRange,
+  TimeseriesPoint,
+} from "../types/Drill";
 import httpClient from "./httpClient";
 import {
   createErrorResponse,
@@ -80,6 +88,51 @@ export const fetchFilterData = async () => {
     throw new Error(`Error: ${response.status} ${response.statusText}`);
   }
 
+  return response.json();
+};
+
+// ---------------------------------------------------------------------------
+// Drill-down endpoints — see plans/dashboard-drill-down.md (Stage B).
+// Backend handlers: src/api/api/drill_routes.py, mounted at /api/drill.
+// ---------------------------------------------------------------------------
+
+type FiltersPayload = { selected_filters: Record<string, string | string[]> };
+
+export const fetchDrillTimeseries = async (params: {
+  selection: DrillSelection;
+  bucket: DrillBucket;
+  filters?: FiltersPayload;
+}): Promise<TimeseriesPoint[]> => {
+  const response = await httpClient.post("/api/drill/timeseries", params);
+  if (!response.ok) {
+    throw new Error(`Error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+};
+
+export const fetchDrillCalls = async (params: {
+  selection: DrillSelection;
+  time_range?: DrillTimeRange;
+  filters?: FiltersPayload;
+  offset: number;
+  limit: number;
+}): Promise<{ total: number; items: CallListItem[] }> => {
+  const response = await httpClient.post("/api/drill/calls", params);
+  if (!response.ok) {
+    throw new Error(`Error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+};
+
+export const fetchCallDetail = async (
+  conversationId: string
+): Promise<CallDetail> => {
+  const response = await httpClient.get(
+    `/api/drill/call/${encodeURIComponent(conversationId)}`
+  );
+  if (!response.ok) {
+    throw new Error(`Error: ${response.status} ${response.statusText}`);
+  }
   return response.json();
 };
 

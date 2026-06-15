@@ -27,6 +27,9 @@ import {
 } from "./state/slices/chatHistorySlice";
 import { resetChatState, setMessages } from "./state/slices/chatSlice";
 import { hideCitation } from "./state/slices/citationSlice";
+import { restoreStack } from "./state/slices/drillSlice";
+import { decodeDrillStack } from "./utils/drillHash";
+import DrillDrawer from "./components/Drill/DrillDrawer";
 import { AppLogo } from "./components/Svg/Svg";
 import CustomSpinner from "./components/CustomSpinner/CustomSpinner";
 import CitationPanel from "./components/CitationPanel/CitationPanel";
@@ -85,6 +88,21 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     void dispatch(fetchLayoutConfig());
+  }, [dispatch]);
+
+  // Drill-down hash routing — see plans/dashboard-drill-down.md (Stage B).
+  // Restore the drill stack on first load if the URL came in with a #/drill/...
+  // hash, and pop one level on every browser back / hashchange.
+  useEffect(() => {
+    const apply = () => {
+      const decoded = decodeDrillStack(window.location.hash);
+      if (decoded) {
+        dispatch(restoreStack({ stack: decoded, isOpen: true }));
+      }
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
   }, [dispatch]);
 
   useEffect(() => {
@@ -331,6 +349,7 @@ const Dashboard: React.FC = () => {
             </div>
           )}
       </div>
+      <DrillDrawer />
     </FluentProvider>
   );
 };
