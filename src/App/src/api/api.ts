@@ -11,6 +11,7 @@ import {
   type CosmosDBHealth,
   CosmosDBStatus,
   type ModelOption,
+  type ModelStatus,
 } from "../types/AppTypes";
 import httpClient from "./httpClient";
 import {
@@ -364,4 +365,13 @@ export const selectModel = async (modelId: string): Promise<void> => {
         : `Error: ${response.status} ${response.statusText}`
     );
   }
+};
+
+export const fetchModelStatus = async (): Promise<ModelStatus> => {
+  const response = await httpClient.get("/api/models/status");
+  if (!response.ok) {
+    throw new Error(`Error: ${response.status} ${response.statusText}`);
+  }
+  const payload = await parseResponseJson<ModelStatus>(response);
+  return payload ?? { model: null, status: "unknown", ready: false, agents: {} };
 };

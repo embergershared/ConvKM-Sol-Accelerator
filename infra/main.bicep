@@ -1464,6 +1464,181 @@ module webSiteFrontend 'modules/web-sites.bicep' = {
   }
 }
 
+// ===================================================================
+// ========== System-assigned identity RBAC mirror ===================
+// ===================================================================
+// Azure Policy in some tenants force-enables a system-assigned managed
+// identity (SAMI) on every App Service in addition to the user-assigned
+// managed identity (UAMI) this solution provisions. When both identities
+// are attached, ``DefaultAzureCredential`` / ``ManagedIdentityCredential``
+// can pick either one depending on which code path runs (and whether
+// AZURE_CLIENT_ID is set on the specific call). Any path that resolves to
+// the SAMI then fails with 401/403 against data-plane services because
+// only the UAMI was granted permissions above.
+//
+// To make the deployment resilient in those tenants, we redundantly grant
+// the SAMI of each App Service the SAME data-plane roles its UAMI has on
+// the SAME target services. The assignments are idempotent (deterministic
+// GUIDs) and harmless when the policy is not enforced — they simply give
+// the SAMI a superset of permissions it would otherwise never use.
+//
+// NOTE: SQL Server admin (line ~1140) only accepts a single identity and
+// cannot be dual-assigned, so it is intentionally NOT mirrored. Contained
+// SQL users for the SAMI would need to be provisioned at the data plane
+// (T-SQL ``CREATE USER ... FROM EXTERNAL PROVIDER``) which is out of scope
+// for this Bicep template.
+// ===================================================================
+
+// --- Built-in role definition GUIDs (extracted for readability) ---
+var roleId_AzureAIUser                          = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+var roleId_AzureAIDeveloper                     = '64702f94-c441-49e6-a78b-ef80e0188fee'
+var roleId_CognitiveServicesOpenAIUser          = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+var roleId_SearchServiceContributor             = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
+var roleId_SearchIndexDataContributor           = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
+var roleId_SearchIndexDataReader                = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
+var roleId_StorageBlobDataContributor           = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+var roleId_StorageAccountContributor            = '17d1049b-9a84-46fb-8f53-869881c3d3ab'
+var roleId_StorageFileDataPrivilegedContributor = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+// Cosmos DB Built-in Data Contributor (data plane). Has the same
+// dataActions as the custom 'Cosmos DB SQL Data Contributor' role
+// defined on the cosmos account above. Using the built-in avoids the
+// circular dependency that referencing the AVM-created custom role
+// definition would introduce.
+var cosmosBuiltinDataContributorRoleId          = '00000000-0000-0000-0000-000000000002'
+
+// ----------------------------------------------------------------
+// --- Backend App Service (api-${suffix}) SAMI role assignments ---
+// ----------------------------------------------------------------
+// Mirrors every role granted to backendUserAssignedIdentity above on
+// every service the backend touches. Search Service Contributor is
+// additionally granted here because the backend startup probe needs to
+// read index metadata.
+//
+// AI Foundry roles are mirrored via a dedicated module call when the AI
+// Foundry account lives in a remote subscription/resource group
+// (existing-foundry case), to avoid cross-RG ``existing`` references.
+
+module backendWebSiteSamiMirror 'modules/web-site-sami-rbac-mirror.bicep' = {
+  name: take('module.sami-mirror.${backendWebSiteResourceName}', 64)
+  params: {
+    appServiceName: backendWebSiteResourceName
+    principalId: webSiteBackend.outputs.systemAssignedMIPrincipalId!
+    aiFoundryAccountName: useExistingAiFoundryAiProject ? '' : aiFoundryAiServicesResourceName
+    aiFoundryRoleIds: useExistingAiFoundryAiProject ? [] : [
+      roleId_AzureAIUser
+      roleId_AzureAIDeveloper
+      roleId_CognitiveServicesOpenAIUser
+    ]
+    searchServiceName: aiSearchName
+    searchRoleIds: [
+      roleId_SearchIndexDataReader
+      roleId_SearchServiceContributor
+    ]
+    cosmosAccountName: cosmosDbResourceName
+    cosmosRoleIds: [
+      cosmosBuiltinDataContributorRoleId
+    ]
+  }
+  dependsOn: [
+    cosmosDb
+    searchServiceUpdate
+  ]
+}
+
+// Cross-RG AI Foundry case: deploy role assignments in the remote RG.
+module backendWebSiteSamiOnExistingAiFoundry 'modules/role-assignment.bicep' = [
+  for roleId in [
+    roleId_AzureAIUser
+    roleId_AzureAIDeveloper
+    roleId_CognitiveServicesOpenAIUser
+  ]: if (useExistingAiFoundryAiProject) {
+    name: take('module.ra.beSami-aiFoundry.${roleId}', 64)
+    scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
+    params: {
+      principalId: webSiteBackend.outputs.systemAssignedMIPrincipalId!
+      roleDefinitionId: roleId
+      targetResourceName: '${aiFoundryAiServicesResourceName}-beSami'
+    }
+  }
+]
+
+module backendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+  name: take('module.acr-pull.sami.backend.${containerRegistryNameForAcrPull}', 64)
+  params: {
+    acrName: containerRegistryNameForAcrPull
+    principalId: webSiteBackend.outputs.systemAssignedMIPrincipalId!
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// -----------------------------------------------------------------
+// --- Frontend App Service (app-${suffix}) SAMI role assignments ---
+// -----------------------------------------------------------------
+// Mirrors every role granted to userAssignedIdentity above for the
+// services the frontend touches. SQL Server admin (line ~1140) is
+// intentionally NOT mirrored: SQL Server accepts a single administrator
+// identity only.
+
+module frontendWebSiteSamiMirror 'modules/web-site-sami-rbac-mirror.bicep' = {
+  name: take('module.sami-mirror.${webSiteResourceName}', 64)
+  params: {
+    appServiceName: webSiteResourceName
+    principalId: webSiteFrontend.outputs.systemAssignedMIPrincipalId!
+    aiFoundryAccountName: useExistingAiFoundryAiProject ? '' : aiFoundryAiServicesResourceName
+    aiFoundryRoleIds: useExistingAiFoundryAiProject ? [] : [
+      roleId_AzureAIUser
+      roleId_AzureAIDeveloper
+      roleId_CognitiveServicesOpenAIUser
+    ]
+    aiFoundryCuAccountName: aiServicesNameCu
+    aiFoundryCuRoleIds: [
+      roleId_AzureAIUser
+    ]
+    searchServiceName: aiSearchName
+    searchRoleIds: [
+      roleId_SearchServiceContributor
+      roleId_CognitiveServicesOpenAIUser
+      roleId_SearchIndexDataContributor
+      roleId_SearchIndexDataReader
+    ]
+    storageAccountName: storageAccountName
+    storageRoleIds: [
+      roleId_StorageBlobDataContributor
+      roleId_StorageAccountContributor
+      roleId_StorageFileDataPrivilegedContributor
+    ]
+  }
+  dependsOn: [
+    searchServiceUpdate
+    storageAccount
+  ]
+}
+
+module frontendWebSiteSamiOnExistingAiFoundry 'modules/role-assignment.bicep' = [
+  for roleId in [
+    roleId_AzureAIUser
+    roleId_AzureAIDeveloper
+    roleId_CognitiveServicesOpenAIUser
+  ]: if (useExistingAiFoundryAiProject) {
+    name: take('module.ra.feSami-aiFoundry.${roleId}', 64)
+    scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
+    params: {
+      principalId: webSiteFrontend.outputs.systemAssignedMIPrincipalId!
+      roleDefinitionId: roleId
+      targetResourceName: '${aiFoundryAiServicesResourceName}-feSami'
+    }
+  }
+]
+
+module frontendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+  name: take('module.acr-pull.sami.frontend.${containerRegistryNameForAcrPull}', 64)
+  params: {
+    acrName: containerRegistryNameForAcrPull
+    principalId: webSiteFrontend.outputs.systemAssignedMIPrincipalId!
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ========== Outputs ========== //
 @description('Contains Solution Name.')
 output SOLUTION_NAME string = solutionSuffix

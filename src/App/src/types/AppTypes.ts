@@ -39,6 +39,27 @@ export type ModelOption = {
   is_default: boolean;
 };
 
+export type ModelStatusValue =
+  | "active"
+  | "creating"
+  | "failed"
+  | "unknown";
+
+export type ModelStatus = {
+  model: string | null;
+  status: ModelStatusValue;
+  ready: boolean;
+  agents: Record<
+    string,
+    {
+      model: string | null;
+      status: string;
+      version?: string | null;
+      error?: string;
+    }
+  >;
+};
+
 export type ConversationRequest = {
   id?: string;
   query: string;

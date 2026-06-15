@@ -231,6 +231,29 @@ async def select_model(
     return JSONResponse(content=result)
 
 
+@router.get("/models/status")
+async def get_model_status(
+    service: Annotated[ModelService, Depends(_build_model_service)],
+):
+    """Return the readiness status of the chat agents' current model.
+
+    Used by the UI to poll after a /models/select call, since Foundry takes
+    1-2 minutes to provision a newly-published agent version before it can
+    serve chat traffic. ``status`` is "active" when both agents' latest
+    versions are bound and ready; "creating" while still provisioning;
+    "failed" if Foundry reports a permanent error.
+    """
+    logger.info("GET /models/status called")
+    try:
+        return JSONResponse(content=await service.get_status())
+    except Exception as exc:
+        logger.exception("Error getting model status: %s", exc)
+        return JSONResponse(
+            content={"error": "Failed to read model status due to an internal error."},
+            status_code=500,
+        )
+
+
 @router.get("/layout-config")
 async def get_layout_config():
     logger.info("GET /layout-config called")

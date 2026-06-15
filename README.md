@@ -106,6 +106,52 @@ _Note: This is not meant to outline all costs as selected SKUs, scaled use, cust
 >⚠️ **Important:** To avoid unnecessary costs, remember to take down your app if it's no longer in use,
 either by deleting the resource group in the Portal or running `azd down`.
 
+### Operating the chat agents — model changes
+
+> 🚫 **Do NOT change the chat agents' model from the Azure AI Foundry portal.**
+> Always use the **model selector dropdown inside the Chat card** of this app.
+
+The solution manages two Foundry agents (`KM-ConversationAgent-<solutionName>` and
+`KM-TitleAgent-<solutionName>`). The conversation agent has tools bound to it
+(SQL function tool + **Azure AI Search agent tool**). The Azure AI Search tool
+is what produces the inline `[1]`, `[2]` citation markers and powers the
+citation side-panel — without it, search-grounded answers and citations break.
+
+When you change the model from the Foundry portal, the portal performs a
+conservative compatibility check against its catalog metadata. For many
+deployments (including `gpt-4o-mini`) the catalog does not flag the deployment
+as compatible with the Azure AI Search agent tool, so the portal shows an
+**"Unsupported tools"** dialog offering to drop the tool if you proceed.
+Clicking *Confirm* **permanently removes Azure AI Search from the agent**,
+breaking citations until someone re-runs `infra/scripts/agent_scripts/01_create_agents.py`
+to rebuild the agent definition.
+
+The app's dropdown avoids this entirely:
+
+- `ModelService.select_model()` (`src/api/services/model_service.py`) calls
+  `agents.create_version()` directly via the SDK, which does **not** enforce
+  the portal's catalog compatibility check.
+- On every model swap it **rebuilds** the conversation agent's tools from
+  source (`get_conversation_agent_tools(...)`) rather than round-tripping the
+  GET response, so the search connection ID and index name are always
+  re-wired correctly.
+- Both agents are updated in the same request and the thread cache is
+  invalidated so the next chat picks up the new version.
+
+Administrator guidance:
+
+| You want to… | Do this | Don't do this |
+|---|---|---|
+| Change the model used by chat | Use the model dropdown in the Chat card | Open the Foundry portal → agent → Playground → Model picker |
+| Add/remove a tool on the conversation agent | Edit `get_conversation_agent_tools()` then redeploy + re-run the agent script | Edit tools in the portal |
+| See which model is currently bound | Check the dropdown selection (it reads `versions.latest.definition.model` from both agents) | Trust the portal alone — the app is the source of truth |
+| Recover after a portal change accidentally stripped tools | Re-run `infra/scripts/agent_scripts/01_create_agents.py` with the original parameters | Manually re-add tools in the portal |
+
+If the model change is initiated through the app you will see an amber
+**"Activating <model>…"** toast in the top-right corner of the page while
+Foundry provisions the new agent version (typically 1-2 minutes). The chat
+input is disabled until both agents report `status: "active"`.
+
 ## Resources
 
 | Product | Description | Tier / Expected Usage Notes | Cost |

@@ -19,7 +19,7 @@ import { ChatAdd24Regular } from "@fluentui/react-icons";
 import "./Chat.css";
 import { getIsChartDisplayDefault } from "../../api/api";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
-import { fetchModels, selectModel } from "../../state/slices/appSlice";
+import { fetchModelStatusOnce, fetchModels, pollModelStatus, selectModel } from "../../state/slices/appSlice";
 import { setUserMessage } from "../../state/slices/chatSlice";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useChatApi } from "../../hooks/useChatApi";
@@ -54,6 +54,12 @@ const Chat: React.FC<ChatProps> = ({
   const availableModels = useAppSelector((state) => state.app.availableModels);
   const selectedModelId = useAppSelector((state) => state.app.selectedModelId);
   const modelSwitching = useAppSelector((state) => state.app.modelSwitching);
+  const modelStatus = useAppSelector((state) => state.app.modelStatus);
+  const modelStatusError = useAppSelector(
+    (state) => state.app.modelStatusError
+  );
+  const pendingModelId = useAppSelector((state) => state.app.pendingModelId);
+  const modelChangePending = modelSwitching || modelStatus === "creating";
 
   const questionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [isChartLoading, setIsChartLoading] = useState(false);
@@ -61,6 +67,18 @@ const Chat: React.FC<ChatProps> = ({
 
   useEffect(() => {
     void dispatch(fetchModels());
+    // If a model swap is still mid-flight from before this page mounted
+    // (e.g. user reloaded), pick up where we left off so the badge appears.
+    void dispatch(fetchModelStatusOnce())
+      .unwrap()
+      .then((status) => {
+        if (!status.ready && status.status === "creating") {
+          void dispatch(pollModelStatus(undefined));
+        }
+      })
+      .catch(() => {
+        // Best-effort: a failed initial status read shouldn't block the UI.
+      });
   }, [dispatch]);
 
   useEffect(() => {
@@ -119,8 +137,11 @@ const Chat: React.FC<ChatProps> = ({
   ]);
 
   const isInputDisabled = useMemo(
-    () => generatingResponse || isHistoryUpdateAPIPending,
-    [generatingResponse, isHistoryUpdateAPIPending]
+    () =>
+      generatingResponse ||
+      isHistoryUpdateAPIPending ||
+      modelChangePending,
+    [generatingResponse, isHistoryUpdateAPIPending, modelChangePending]
   );
 
   const handleSend = useCallback(() => {
@@ -155,6 +176,35 @@ const Chat: React.FC<ChatProps> = ({
 
   return (
     <div className="chat-container">
+      {modelChangePending && (
+        <div
+          className="model-status-toast model-status-toast--pending"
+          role="status"
+          aria-live="polite"
+          title={
+            pendingModelId
+              ? `Activating ${pendingModelId} on the chat agents — Foundry typically takes 1-2 minutes.`
+              : "Activating new model on the chat agents…"
+          }
+        >
+          <Spinner size={SpinnerSize.xSmall} />
+          <span>
+            {pendingModelId
+              ? `Activating ${pendingModelId}…`
+              : "Activating new model…"}
+          </span>
+        </div>
+      )}
+      {!modelChangePending && modelStatus === "failed" && (
+        <div
+          className="model-status-toast model-status-toast--error"
+          role="status"
+          aria-live="polite"
+          title={modelStatusError ?? "Model change failed."}
+        >
+          ⚠ {modelStatusError ?? "Model change failed."}
+        </div>
+      )}
       <div className="chat-header">
         <Subtitle2>Chat</Subtitle2>
         <div className="chat-header-controls">
@@ -167,7 +217,7 @@ const Chat: React.FC<ChatProps> = ({
             selectedOptions={selectedModel ? [selectedModel.id] : []}
             value={selectedModel?.display_name ?? ""}
             onOptionSelect={handleModelSelect}
-            disabled={availableModels.length === 0 || modelSwitching}
+            disabled={availableModels.length === 0 || modelChangePending}
           >
             {availableModels.map((model) => (
               <Option key={model.id} value={model.id} text={model.display_name}>
