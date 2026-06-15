@@ -3,15 +3,18 @@ import json
 import logging
 import math
 import os
-from fastapi import APIRouter, Request
+from typing import Annotated
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import requests
+from azure.ai.projects.aio import AIProjectClient
 from common.config.config import Config
 from api.models.input_models import ChartFilters
 from services.chat_service import ChatService
 from services.chart_service import ChartService
+from services.model_service import ModelService
 from common.logging.event_utils import track_event_if_configured
-from helpers.azure_credential_utils import get_azure_credential
+from helpers.azure_credential_utils import get_azure_credential, get_azure_credential_async
 from auth.auth_utils import get_authenticated_user_details
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -19,6 +22,34 @@ from opentelemetry.trace import Status, StatusCode
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+async def _build_model_service():
+    """Yield a ModelService backed by a fresh AIProjectClient.
+
+    The AIProjectClient (azure.ai.projects.aio) exposes both the deployments
+    listing and the agent version-management methods the ModelService needs.
+
+    Both the credential and the client are entered as async context managers so
+    aiohttp's underlying ``ClientSession`` and ``TCPConnector`` are released
+    cleanly when the request completes (without this we leak them and the
+    log shows "Unclosed client session / Unclosed connector" on every call).
+    """
+    config = Config()
+    credential = await get_azure_credential_async(client_id=config.azure_client_id or None)
+    async with credential:
+        async with AIProjectClient(
+            endpoint=config.ai_project_endpoint,
+            credential=credential,
+        ) as project_client:
+            yield ModelService(
+                project_client=project_client,
+                conversation_agent_name=config.orchestrator_agent_name,
+                title_agent_name=config.title_agent_name,
+                chat_service=ChatService(),
+                search_connection_name=config.azure_ai_search_connection_name or "",
+                search_index_name=config.azure_ai_search_index or "",
+            )
 
 
 @router.get("/fetchChartData")
@@ -147,6 +178,57 @@ async def conversation(request: Request):
             span.record_exception(ex)
             span.set_status(Status(StatusCode.ERROR, str(ex)))
         return JSONResponse(content={"error": "An internal error occurred while processing the conversation."}, status_code=500)
+
+
+@router.get("/models")
+async def get_models(
+    service: Annotated[ModelService, Depends(_build_model_service)],
+):
+    """List chat-capable model deployments available in the Foundry project."""
+    logger.info("GET /models called")
+    try:
+        return JSONResponse(content=await service.list_models())
+    except Exception as exc:
+        logger.exception("Error listing models: %s", exc)
+        return JSONResponse(
+            content={"error": "Failed to list models due to an internal error."},
+            status_code=500,
+        )
+
+
+@router.post("/models/select")
+async def select_model(
+    request: Request,
+    service: Annotated[ModelService, Depends(_build_model_service)],
+):
+    """Apply the selected model to both chat agents (global change)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"error": "Invalid request body."}, status_code=400)
+
+    model = body.get("model")
+    model_id = model.strip() if isinstance(model, str) else model
+    if not model_id:
+        return JSONResponse(content={"error": "'model' is required."}, status_code=400)
+
+    logger.info("POST /models/select called: model=%s", model_id)
+    try:
+        result = await service.select_model(model_id)
+    except ValueError as exc:
+        return JSONResponse(content={"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.exception("Error selecting model %s: %s", model_id, exc)
+        span = trace.get_current_span()
+        if span is not None:
+            span.record_exception(exc)
+            span.set_status(Status(StatusCode.ERROR, str(exc)))
+        return JSONResponse(
+            content={"error": "Failed to apply model selection due to an internal error."},
+            status_code=500,
+        )
+
+    return JSONResponse(content=result)
 
 
 @router.get("/layout-config")

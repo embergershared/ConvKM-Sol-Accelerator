@@ -1371,3 +1371,42 @@ Once all services are running (as confirmed in Step 6), you can:
 • [Azure Account Setup](./AzureAccountSetUp.md) - Azure subscription and quota requirements
 
 ---
+
+## Agent Admin Page
+
+The application includes an **Agent Administration** page accessible via the **Admin** button (gear icon) in the header, or by navigating to `#/admin` in the browser URL.
+
+### Features
+
+- **View** the current active agent instructions and model deployment
+- **Edit** instructions in a monospace text editor
+- **Change** the model deployment (auto-populated dropdown from AI Foundry project deployments, cached for 60s)
+- **Publish** a new agent version live (in-process thread cache is invalidated so existing conversations pick up the new version on their next turn)
+- **Version history** with timestamp, publisher, and rollback (rollback dialog previews the target version's instructions and model)
+
+### Environment Variables
+
+No new environment variables are required. The admin page reuses:
+- `AZURE_AI_AGENT_ENDPOINT` — AI Foundry project endpoint
+- `AGENT_NAME_CONVERSATION` — name of the conversation agent to manage
+- `AZURE_AI_SEARCH_CONNECTION_NAME` — used when publishing (tools definition)
+- `AZURE_AI_SEARCH_INDEX` — used when publishing (tools definition)
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/admin/agent` | Current active agent version |
+| `GET` | `/api/admin/agent/versions` | Version history |
+| `GET` | `/api/admin/agent/versions/{id}` | Specific version details |
+| `POST` | `/api/admin/agent` | Publish new version |
+| `POST` | `/api/admin/agent/rollback` | Rollback to a previous version |
+| `GET` | `/api/admin/models` | List available model deployments |
+
+### Security Note
+
+> ⚠️ The admin page is currently **unauthenticated** and intended for internal/demo use only. For production deployments, gate access via Azure Easy Auth admin role or similar authorization mechanism.
+
+### Multi-instance deployments
+
+The thread cache invalidation triggered by publish/rollback applies to the local process only. When the API is scaled to multiple instances (e.g. App Service with multiple workers), other instances will keep serving the previous version's threads until the cache TTL expires (default 1 hour). An in-flight streaming response always finishes against the agent version it started with.

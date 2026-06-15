@@ -10,6 +10,7 @@ import {
   type ConversationRequest,
   type CosmosDBHealth,
   CosmosDBStatus,
+  type ModelOption,
 } from "../types/AppTypes";
 import httpClient from "./httpClient";
 import {
@@ -341,4 +342,26 @@ export const fetchCitationContent = async (body: any) => {
   }
 
   return response.json();
+};
+
+export const fetchModels = async (): Promise<ModelOption[]> => {
+  const response = await httpClient.get("/api/models");
+  if (!response.ok) {
+    throw new Error(`Error: ${response.status} ${response.statusText}`);
+  }
+
+  const payload = await parseResponseJson<ModelOption[]>(response);
+  return Array.isArray(payload) ? payload : [];
+};
+
+export const selectModel = async (modelId: string): Promise<void> => {
+  const response = await httpClient.post("/api/models/select", { model: modelId });
+  if (!response.ok) {
+    const errorData = await parseResponseJson<{ error?: unknown }>(response);
+    throw new Error(
+      typeof errorData?.error === "string"
+        ? errorData.error
+        : `Error: ${response.status} ${response.statusText}`
+    );
+  }
 };

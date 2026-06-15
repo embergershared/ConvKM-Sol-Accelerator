@@ -21,12 +21,21 @@ RUN curl -O https://download.microsoft.com/download/fae28b9a-d880-42fd-9b98-d779
 # Set the working directory inside the container
 WORKDIR /app
 
+# Make Python logging visible immediately in Azure Log stream.
+#   PYTHONUNBUFFERED   — flush stdout/stderr line-by-line, no buffering.
+#   PYTHONFAULTHANDLER — dump a Python traceback on segfault / fatal signal.
+#   PYTHONDONTWRITEBYTECODE — keep the image smaller / read-only friendly.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 # Copy only the requirements file first to leverage Docker layer caching
 COPY ./requirements.txt .
 
 # Install Python dependencies
-RUN pip install --upgrade pip setuptools wheel \ 
-    && pip install --no-cache-dir -r requirements.txt && rm -rf /root/.cache
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt && \
+    rm -rf /root/.cache
 
 # Copy the backend application code into the container
 COPY ./ .
@@ -34,5 +43,9 @@ COPY ./ .
 # Expose port 80 for incoming traffic
 EXPOSE 80
 
-# Start the application using Uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+# Start the application using Uvicorn.
+#   --log-level info          — match the app's default log level.
+#   --access-log              — emit one log line per request (visible in Log stream).
+#   --proxy-headers           — honor X-Forwarded-* from the App Service front-end.
+#   --forwarded-allow-ips=*   — trust those headers from any upstream (App Service).
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info", "--access-log", "--proxy-headers", "--forwarded-allow-ips", "*"]

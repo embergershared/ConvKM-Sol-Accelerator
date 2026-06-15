@@ -801,3 +801,4 @@ class TestChatService:
         error_data = json.loads(chunks[0].strip())
         assert "error" in error_data
         assert "An error occurred while processing the request" in error_data["error"]
+

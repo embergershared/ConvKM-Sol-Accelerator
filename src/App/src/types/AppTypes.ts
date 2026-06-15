@@ -33,6 +33,12 @@ export type ChatMessage = {
   citations?: string
 };
 
+export type ModelOption = {
+  id: string;
+  display_name: string;
+  is_default: boolean;
+};
+
 export type ConversationRequest = {
   id?: string;
   query: string;

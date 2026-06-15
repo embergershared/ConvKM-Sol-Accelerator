@@ -5,12 +5,21 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Body1, Button, Subtitle2, Textarea } from "@fluentui/react-components";
+import {
+  Body1,
+  Button,
+  Dropdown,
+  Option,
+  type OptionOnSelectData,
+  Subtitle2,
+  Textarea,
+} from "@fluentui/react-components";
 import { DefaultButton, Spinner, SpinnerSize } from "@fluentui/react";
 import { ChatAdd24Regular } from "@fluentui/react-icons";
 import "./Chat.css";
 import { getIsChartDisplayDefault } from "../../api/api";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
+import { fetchModels, selectModel } from "../../state/slices/appSlice";
 import { setUserMessage } from "../../state/slices/chatSlice";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useChatApi } from "../../hooks/useChatApi";
@@ -42,10 +51,17 @@ const Chat: React.FC<ChatProps> = ({
   const isHistoryUpdateAPIPending = useAppSelector(
     (state) => state.chatHistory.isHistoryUpdateAPIPending
   );
+  const availableModels = useAppSelector((state) => state.app.availableModels);
+  const selectedModelId = useAppSelector((state) => state.app.selectedModelId);
+  const modelSwitching = useAppSelector((state) => state.app.modelSwitching);
 
   const questionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [isChartDisplayDefault, setIsChartDisplayDefault] = useState(false);
+
+  useEffect(() => {
+    void dispatch(fetchModels());
+  }, [dispatch]);
 
   useEffect(() => {
     let isMounted = true;
@@ -76,6 +92,22 @@ const Chat: React.FC<ChatProps> = ({
     setIsChartLoading,
     isChartDisplayDefault,
   });
+
+  const selectedModel = useMemo(
+    () =>
+      availableModels.find((model) => model.id === selectedModelId) ??
+      availableModels.find((model) => model.is_default),
+    [availableModels, selectedModelId]
+  );
+
+  const handleModelSelect = useCallback(
+    (_event: unknown, data: OptionOnSelectData) => {
+      if (data.optionValue && data.optionValue !== selectedModelId) {
+        void dispatch(selectModel(data.optionValue));
+      }
+    },
+    [dispatch, selectedModelId]
+  );
 
   useEffect(() => {
     scrollChatToBottom("auto");
@@ -125,7 +157,24 @@ const Chat: React.FC<ChatProps> = ({
     <div className="chat-container">
       <div className="chat-header">
         <Subtitle2>Chat</Subtitle2>
-        <span>
+        <div className="chat-header-controls">
+          <Dropdown
+            aria-label="Select model"
+            className="model-selector-dropdown"
+            appearance="outline"
+            size="small"
+            placeholder="Model"
+            selectedOptions={selectedModel ? [selectedModel.id] : []}
+            value={selectedModel?.display_name ?? ""}
+            onOptionSelect={handleModelSelect}
+            disabled={availableModels.length === 0 || modelSwitching}
+          >
+            {availableModels.map((model) => (
+              <Option key={model.id} value={model.id} text={model.display_name}>
+                {model.display_name}
+              </Option>
+            ))}
+          </Dropdown>
           <Button
             appearance="outline"
             onClick={() => onHandlePanelStates(panels.CHATHISTORY)}
@@ -133,7 +182,7 @@ const Chat: React.FC<ChatProps> = ({
           >
             {`${panelShowStates[panels.CHATHISTORY] ? "Hide" : "Show"} Chat History`}
           </Button>
-        </span>
+        </div>
       </div>
       <div className="chat-messages">
         {isFetchingConvMessages && (

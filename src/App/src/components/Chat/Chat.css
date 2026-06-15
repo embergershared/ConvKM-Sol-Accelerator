@@ -148,11 +148,28 @@
   height: 6vh;
   display: flex;
   align-items: center;
-  margin-left: 0.5rem;
-  gap: 3%;
-  display: flex;
   justify-content: space-between;
   margin-inline: 2%;
+  gap: 1rem;
+}
+
+.chat-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.model-selector-dropdown {
+  min-width: 9rem;
+  max-width: 12rem;
+}
+
+.model-selector-dropdown button {
+  min-height: 2rem;
+  font-size: 0.8125rem;
 }
 .initial-msg {
   display: flex;

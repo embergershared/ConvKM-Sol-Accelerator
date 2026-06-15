@@ -19,7 +19,7 @@ async def test_health_check(test_app):
     app, client = test_app
     response = await client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json() == {"status": "healthy", "version": "1.0.0"}
 
 
 # Removed test_lifespan_startup_and_shutdown as agent factories no longer exist in v2

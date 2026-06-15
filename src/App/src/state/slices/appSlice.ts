@@ -1,15 +1,23 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { generateUUIDv4 } from "../../configs/Utils";
-import { getLayoutConfig } from "../../api/api";
+import {
+  fetchModels as fetchModelsApi,
+  getLayoutConfig,
+  selectModel as selectModelApi,
+} from "../../api/api";
 import {
   type AppConfig,
   type ChartConfigItem,
   type CosmosDBHealth,
+  type ModelOption,
 } from "../../types/AppTypes";
 
 export type AppSliceState = {
   selectedConversationId: string;
   generatedConversationId: string;
+  availableModels: ModelOption[];
+  selectedModelId: string;
+  modelSwitching: boolean;
   config: {
     appConfig: AppConfig;
     charts: ChartConfigItem[];
@@ -21,6 +29,9 @@ export type AppSliceState = {
 const initialState: AppSliceState = {
   selectedConversationId: "",
   generatedConversationId: generateUUIDv4(),
+  availableModels: [],
+  selectedModelId: "",
+  modelSwitching: false,
   config: {
     appConfig: null,
     charts: [],
@@ -34,6 +45,36 @@ export const fetchLayoutConfig = createAsyncThunk(
   async () => getLayoutConfig()
 );
 
+export const fetchModels = createAsyncThunk<
+  ModelOption[],
+  void,
+  { rejectValue: string }
+>("app/fetchModels", async (_, { rejectWithValue }) => {
+  try {
+    return await fetchModelsApi();
+  } catch {
+    return rejectWithValue("Unable to load models.");
+  }
+});
+
+const getDefaultModelId = (models: ModelOption[]) =>
+  models.find((model) => model.is_default)?.id ?? models[0]?.id ?? "";
+
+export const selectModel = createAsyncThunk<
+  string,
+  string,
+  { rejectValue: string }
+>("app/selectModel", async (modelId, { dispatch, rejectWithValue }) => {
+  try {
+    await selectModelApi(modelId);
+    // Re-read the deployments so is_default reflects the agents' new model.
+    await dispatch(fetchModels());
+    return modelId;
+  } catch {
+    return rejectWithValue("Unable to apply the selected model.");
+  }
+});
+
 const appSlice = createSlice({
   name: "app",
   initialState,
@@ -43,6 +84,9 @@ const appSlice = createSlice({
     },
     setGeneratedConversationId(state, action: PayloadAction<string>) {
       state.generatedConversationId = action.payload;
+    },
+    setSelectedModelId(state, action: PayloadAction<string>) {
+      state.selectedModelId = action.payload;
     },
     startNewConversation(state) {
       state.selectedConversationId = "";
@@ -65,6 +109,28 @@ const appSlice = createSlice({
     builder
       .addCase(fetchLayoutConfig.fulfilled, (state, action) => {
         state.config = action.payload;
+      })
+      .addCase(fetchModels.fulfilled, (state, action) => {
+        state.availableModels = action.payload;
+
+        if (
+          state.selectedModelId &&
+          action.payload.some((model) => model.id === state.selectedModelId)
+        ) {
+          return;
+        }
+
+        state.selectedModelId = getDefaultModelId(action.payload);
+      })
+      .addCase(selectModel.pending, (state) => {
+        state.modelSwitching = true;
+      })
+      .addCase(selectModel.fulfilled, (state, action) => {
+        state.modelSwitching = false;
+        state.selectedModelId = action.payload;
+      })
+      .addCase(selectModel.rejected, (state) => {
+        state.modelSwitching = false;
       });
   },
 });
@@ -72,6 +138,7 @@ const appSlice = createSlice({
 export const {
   setSelectedConversationId,
   setGeneratedConversationId,
+  setSelectedModelId,
   startNewConversation,
   setShowAppSpinner,
   setCosmosInfo,

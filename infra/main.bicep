@@ -121,6 +121,13 @@ param frontendContainerImageName string = 'km-app'
 @description('Optional. The Container Image Tag to deploy on the frontend.')
 param frontendContainerImageTag string = 'latest_afv2_2026-03-10_1326'
 
+@description('Optional. When true, configure the API and Frontend WebApps to pull their container images from the registry using their managed identity instead of admin credentials. Required when using a private ACR that does not allow anonymous pulls. Defaults to false to preserve compatibility with the public accelerator registry (kmcontainerreg.azurecr.io).')
+param useManagedIdentityForAcrPull bool = false
+
+@description('Optional. Name of the Azure Container Registry (in this resource group) to grant AcrPull on when useManagedIdentityForAcrPull is true. Leave empty to skip role-assignment provisioning (e.g. when the registry lives in a different RG/subscription and AcrPull must be granted out-of-band).')
+param containerRegistryNameForAcrPull string = ''
+
+
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
 
@@ -1303,10 +1310,32 @@ var reactAppLayoutConfig = '''{
   ]
 }'''
 
+// ========== AcrPull role assignments for App Service managed-identity pulls ========== //
+// Only deployed when the registry name is provided AND MI-based pulls are enabled.
+// Must run before the WebApp modules so the role exists at first image pull.
+module backendAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+  name: take('module.acr-pull.backend.${containerRegistryNameForAcrPull}', 64)
+  params: {
+    acrName: containerRegistryNameForAcrPull
+    principalId: backendUserAssignedIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+module frontendAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+  name: take('module.acr-pull.frontend.${containerRegistryNameForAcrPull}', 64)
+  params: {
+    acrName: containerRegistryNameForAcrPull
+    principalId: userAssignedIdentity!.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ========== Web App module ========== //
 var backendWebSiteResourceName = 'api-${solutionSuffix}'
 module webSiteBackend 'modules/web-sites.bicep' = {
   name: take('module.web-sites.${backendWebSiteResourceName}', 64)
+  dependsOn: useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull) ? [ backendAcrPullRole ] : []
   params: {
     name: backendWebSiteResourceName
     tags: tags
@@ -1322,6 +1351,12 @@ module webSiteBackend 'modules/web-sites.bicep' = {
     siteConfig: {
       linuxFxVersion: 'DOCKER|${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
       minTlsVersion: '1.2'
+      // When pulling from a private ACR, App Service must be told to authenticate
+      // using its managed identity. The user-assigned identity below also needs the
+      // AcrPull role on the registry (granted by the acr-pull-role module when
+      // containerRegistryNameForAcrPull is set).
+      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull
+      acrUserManagedIdentityID: useManagedIdentityForAcrPull ? backendUserAssignedIdentity.outputs.clientId : null
     }
     configs: [
       {
@@ -1391,6 +1426,7 @@ module webSiteBackend 'modules/web-sites.bicep' = {
 var webSiteResourceName = 'app-${solutionSuffix}'
 module webSiteFrontend 'modules/web-sites.bicep' = {
   name: take('module.web-sites.${webSiteResourceName}', 64)
+  dependsOn: useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull) ? [ frontendAcrPullRole ] : []
   params: {
     name: webSiteResourceName
     tags: tags
@@ -1399,10 +1435,16 @@ module webSiteFrontend 'modules/web-sites.bicep' = {
     serverFarmResourceId: webServerFarm.outputs.resourceId
     managedIdentities: {
       systemAssigned: true
+      // When MI-based ACR pull is enabled, attach the shared user-assigned identity
+      // so AcrPull can be granted before the WebApp is created (avoids the
+      // chicken-and-egg problem with system-assigned identities).
+      userAssignedResourceIds: useManagedIdentityForAcrPull ? [ userAssignedIdentity!.outputs.resourceId ] : []
     }
     siteConfig: {
       linuxFxVersion: 'DOCKER|${frontendContainerRegistryHostname}/${frontendContainerImageName}:${frontendContainerImageTag}'
       minTlsVersion: '1.2'
+      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull
+      acrUserManagedIdentityID: useManagedIdentityForAcrPull ? userAssignedIdentity!.outputs.clientId : null
     }
     configs: [
       {

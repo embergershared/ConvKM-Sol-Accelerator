@@ -4,13 +4,10 @@ import argparse
 import asyncio
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity.aio import AzureCliCredential
-from azure.ai.projects.models import (
-    PromptAgentDefinition,
-    AzureAISearchAgentTool,
-    FunctionTool,
-    AzureAISearchToolResource,
-    AISearchIndexResource,
-)
+from azure.ai.projects.models import PromptAgentDefinition
+
+# Allow imports from the API source tree
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src', 'api')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 p = argparse.ArgumentParser()
@@ -26,6 +23,8 @@ solutionName = args.solution_name
 gptModelName = args.gpt_model_name
 azure_ai_search_connection_name = args.azure_ai_search_connection_name
 azure_ai_search_index = args.azure_ai_search_index
+
+from services.agent_definition import get_conversation_agent_tools
 
 conversation_agent_instruction = '''You are a helpful assistant.
     Tool Priority:
@@ -98,36 +97,10 @@ async def main():
             definition=PromptAgentDefinition(
                 model=gptModelName,
                 instructions=conversation_agent_instruction,
-                tools=[
-                    # SQL Tool - function tool (requires client-side implementation)
-                    FunctionTool(
-                        name="get_sql_response",
-                        description="Execute T-SQL queries on the database to retrieve quantified, numerical, or metric-based data.",
-                        parameters={
-                            "type": "object",
-                            "properties": {
-                                "sql_query": {
-                                    "type": "string",
-                                    "description": "A valid T-SQL query to execute against the database."
-                                }
-                            },
-                            "required": ["sql_query"]
-                        }
-                    ),
-                    # Azure AI Search - built-in service tool (no client implementation needed)
-                    AzureAISearchAgentTool(
-                        azure_ai_search=AzureAISearchToolResource(
-                            indexes=[
-                                AISearchIndexResource(
-                                    project_connection_id=azure_ai_search_connection_name,
-                                    index_name=azure_ai_search_index,
-                                    query_type="vector_simple",
-                                    top_k=5
-                                )
-                            ]
-                        )
-                    )
-                ]
+                tools=get_conversation_agent_tools(
+                    azure_ai_search_connection_name=azure_ai_search_connection_name,
+                    azure_ai_search_index=azure_ai_search_index,
+                ),
             ),
         )
         
