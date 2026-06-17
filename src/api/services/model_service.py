@@ -494,6 +494,14 @@ class ModelService:
 
         # Log per-agent models so drift between the two agents (e.g. a manual
         # edit in the Foundry portal that updated only one) is visible.
+        if not current_models:
+            logger.error(
+                "Model dropdown: no agent names configured "
+                "(AGENT_NAME_CONVERSATION=%r, AGENT_NAME_TITLE=%r). "
+                "The dropdown cannot determine which model is currently active.",
+                self._conversation_agent_name,
+                self._title_agent_name,
+            )
         logger.info(
             "Model dropdown: current agent models = %s (selected for dropdown=%r)",
             current_models, current_model,
@@ -581,6 +589,12 @@ class ModelService:
             for name in (self._conversation_agent_name, self._title_agent_name)
             if name
         ]
+
+        if not agent_names:
+            raise ValueError(
+                "No agent names configured (AGENT_NAME_CONVERSATION / "
+                "AGENT_NAME_TITLE are both empty). Cannot apply model selection."
+            )
 
         for agent_name in agent_names:
             agent_details = await self._client.agents.get(agent_name)

@@ -27,7 +27,11 @@ import {
 } from "./state/slices/chatHistorySlice";
 import { resetChatState, setMessages } from "./state/slices/chatSlice";
 import { hideCitation } from "./state/slices/citationSlice";
-import { restoreStack } from "./state/slices/drillSlice";
+import { closeDrill, restoreStack } from "./state/slices/drillSlice";
+import {
+  resetSelectedFilters,
+  clearChips,
+} from "./state/slices/dashboardSlice";
 import { decodeDrillStack } from "./utils/drillHash";
 import DrillDrawer from "./components/Drill/DrillDrawer";
 import { AppLogo } from "./components/Svg/Svg";
@@ -275,7 +279,15 @@ const Dashboard: React.FC = () => {
         <div className="header-left-section">
           <AppLogo />
           <Subtitle2>
-            Southern Company <Body2 style={{ gap: "10px" }}>| Customer Calls Sentiment Analysis</Body2>
+            Southern Company <Body2
+              style={{ gap: "10px", cursor: "pointer" }}
+              onClick={() => {
+                dispatch(resetSelectedFilters());
+                dispatch(clearChips());
+                dispatch(closeDrill());
+                window.location.hash = "";
+              }}
+            >| Customer Calls Sentiment Analysis</Body2>
           </Subtitle2>
         </div>
         <div className="header-right-section">
@@ -349,7 +361,13 @@ const Dashboard: React.FC = () => {
             </div>
           )}
       </div>
-      <DrillDrawer />
+      <DrillDrawer
+        onRequestShowChat={() => {
+          if (!panelShowStates[panels.CHAT]) {
+            onHandlePanelStates(panels.CHAT);
+          }
+        }}
+      />
     </FluentProvider>
   );
 };

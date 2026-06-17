@@ -136,6 +136,28 @@ export const fetchCallDetail = async (
   return response.json();
 };
 
+export type AudioAvailability = {
+  available: boolean;
+  url?: string;
+  filename?: string;
+};
+
+export const fetchAudioUrl = async (
+  conversationId: string
+): Promise<AudioAvailability> => {
+  try {
+    const response = await httpClient.get(
+      `/api/audio/${encodeURIComponent(conversationId)}`
+    );
+    if (!response.ok) {
+      return { available: false };
+    }
+    return response.json();
+  } catch {
+    return { available: false };
+  }
+};
+
 export type UserInfo = {
   access_token: string;
   expires_on: string;

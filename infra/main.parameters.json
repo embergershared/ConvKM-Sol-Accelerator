@@ -58,6 +58,15 @@
     },
     "usecase":{
       "value": "${USE_CASE}"
+    },
+    "enableMonitoring": {
+      "value": "${enableMonitoring=false}"
+    },
+    "useManagedIdentityForAcrPull": {
+      "value": "${useManagedIdentityForAcrPull=false}"
+    },
+    "containerRegistryNameForAcrPull": {
+      "value": "${containerRegistryNameForAcrPull}"
     }
   }
 }

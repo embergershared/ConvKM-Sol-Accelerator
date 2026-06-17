@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.40.2.10011",
-      "templateHash": "17527616802198829671"
+      "templateHash": "3565469726423888495"
     }
   },
   "parameters": {
@@ -29,8 +29,7 @@
         "japaneast",
         "northeurope",
         "southeastasia",
-        "uksouth",
-        "swedencentral"
+        "uksouth"
       ],
       "metadata": {
         "azd": {
@@ -130,34 +129,6 @@
         "description": "Optional. Version of AI Agent API."
       }
     },
-    "agentNameConversation": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Optional. Name of the Conversation Agent in Foundry. Defaults to KM-ConversationAgent-{solutionName}."
-      }
-    },
-    "agentNameTitle": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Optional. Name of the Title Agent in Foundry. Defaults to KM-TitleAgent-{solutionName}."
-      }
-    },
-    "modelFilterAllowedPublishers": {
-      "type": "string",
-      "defaultValue": "OpenAI,Microsoft,xAI,DeepSeek,Meta",
-      "metadata": {
-        "description": "Optional. Comma-separated list of model publishers allowed in the model selector dropdown. Defaults to OpenAI,Microsoft,xAI,DeepSeek,Meta."
-      }
-    },
-    "modelFilterRequireFunctionCalling": {
-      "type": "string",
-      "defaultValue": "true",
-      "metadata": {
-        "description": "Optional. Whether to filter out model deployments that do not advertise function-calling support. Defaults to true."
-      }
-    },
     "azureContentUnderstandingApiVersion": {
       "type": "string",
       "defaultValue": "2024-12-01-preview",
@@ -208,7 +179,7 @@
     },
     "backendContainerImageTag": {
       "type": "string",
-      "defaultValue": "latest_afv2_2026-03-10_1326",
+      "defaultValue": "latest_waf_2025-12-02_1084",
       "metadata": {
         "description": "Optional. The Container Image Tag to deploy on the backend."
       }
@@ -229,23 +200,9 @@
     },
     "frontendContainerImageTag": {
       "type": "string",
-      "defaultValue": "latest_afv2_2026-03-10_1326",
+      "defaultValue": "latest_waf_2025-12-02_1084",
       "metadata": {
         "description": "Optional. The Container Image Tag to deploy on the frontend."
-      }
-    },
-    "useManagedIdentityForAcrPull": {
-      "type": "bool",
-      "defaultValue": false,
-      "metadata": {
-        "description": "Optional. When true, configure the API and Frontend WebApps to pull their container images from the registry using their managed identity instead of admin credentials. Required when using a private ACR that does not allow anonymous pulls. Defaults to false to preserve compatibility with the public accelerator registry (kmcontainerreg.azurecr.io)."
-      }
-    },
-    "containerRegistryNameForAcrPull": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Optional. Name of the Azure Container Registry (in this resource group) to grant AcrPull on when useManagedIdentityForAcrPull is true. Leave empty to skip role-assignment provisioning (e.g. when the registry lives in a different RG/subscription and AcrPull must be granted out-of-band)."
       }
     },
     "tags": {
@@ -345,10 +302,6 @@
     }
   },
   "variables": {
-    "mandatoryTags": {
-      "SecurityControl": "Ignore"
-    },
-    "allTags": "[union(parameters('tags'), variables('mandatoryTags'))]",
     "solutionSuffix": "[toLower(trim(replace(replace(replace(replace(replace(replace(format('{0}{1}', parameters('solutionName'), parameters('solutionUniqueText')), '-', ''), '_', ''), '.', ''), '/', ''), ' ', ''), '*', '')))]",
     "acrName": "kmcontainerreg",
     "replicaRegionPairs": {
@@ -361,8 +314,7 @@
       "northeurope": "westeurope",
       "southeastasia": "eastasia",
       "uksouth": "westeurope",
-      "westeurope": "northeurope",
-      "swedencentral": "northeurope"
+      "westeurope": "northeurope"
     },
     "replicaLocation": "[variables('replicaRegionPairs')[resourceGroup().location]]",
     "cosmosDbZoneRedundantHaRegionPairs": {
@@ -375,13 +327,12 @@
       "northeurope": "westeurope",
       "southeastasia": "eastasia",
       "uksouth": "westeurope",
-      "westeurope": "northeurope",
-      "swedencentral": "northeurope"
+      "westeurope": "northeurope"
     },
     "cosmosDbHaLocation": "[variables('cosmosDbZoneRedundantHaRegionPairs')[resourceGroup().location]]",
     "useExistingLogAnalytics": "[not(empty(parameters('existingLogAnalyticsWorkspaceId')))]",
     "existingTags": "[coalesce(resourceGroup().tags, createObject())]",
-    "logAnalyticsWorkspaceResourceName": "[format('law-{0}', variables('solutionSuffix'))]",
+    "logAnalyticsWorkspaceResourceName": "[format('log-{0}', variables('solutionSuffix'))]",
     "applicationInsightsResourceName": "[format('appi-{0}', variables('solutionSuffix'))]",
     "bastionHostName": "[format('bas-{0}', variables('solutionSuffix'))]",
     "jumpboxVmName": "[take(format('vm-jumpbox-{0}', variables('solutionSuffix')), 15)]",
@@ -461,18 +412,7 @@
     "webServerFarmResourceName": "[format('asp-{0}', variables('solutionSuffix'))]",
     "reactAppLayoutConfig": "{\r\n  \"appConfig\": {\r\n    \"THREE_COLUMN\": {\r\n      \"DASHBOARD\": 50,\r\n      \"CHAT\": 33,\r\n      \"CHATHISTORY\": 17\r\n    },\r\n    \"TWO_COLUMN\": {\r\n      \"DASHBOARD_CHAT\": {\r\n        \"DASHBOARD\": 65,\r\n        \"CHAT\": 35\r\n      },\r\n      \"CHAT_CHATHISTORY\": {\r\n        \"CHAT\": 80,\r\n        \"CHATHISTORY\": 20\r\n      }\r\n    }\r\n  },\r\n  \"charts\": [\r\n    {\r\n      \"id\": \"SATISFIED\",\r\n      \"name\": \"Satisfied\",\r\n      \"type\": \"card\",\r\n      \"layout\": { \"row\": 1, \"column\": 1, \"height\": 11 }\r\n    },\r\n    {\r\n      \"id\": \"TOTAL_CALLS\",\r\n      \"name\": \"Total Calls\",\r\n      \"type\": \"card\",\r\n      \"layout\": { \"row\": 1, \"column\": 2, \"span\": 1 }\r\n    },\r\n    {\r\n      \"id\": \"AVG_HANDLING_TIME\",\r\n      \"name\": \"Average Handling Time\",\r\n      \"type\": \"card\",\r\n      \"layout\": { \"row\": 1, \"column\": 3, \"span\": 1 }\r\n    },\r\n    {\r\n      \"id\": \"SENTIMENT\",\r\n      \"name\": \"Sentiment overview\",\r\n      \"type\": \"donutchart\",\r\n      \"layout\": { \"row\": 2, \"column\": 1, \"width\": 40, \"height\": 44.5 }\r\n    },\r\n    {\r\n      \"id\": \"AVG_HANDLING_TIME_BY_TOPIC\",\r\n      \"name\": \"Average Handling Time By Topic\",\r\n      \"type\": \"bar\",\r\n      \"layout\": { \"row\": 2, \"column\": 2, \"row-span\": 2, \"width\": 60 }\r\n    },\r\n    {\r\n      \"id\": \"TOPICS\",\r\n      \"name\": \"Trending Topics\",\r\n      \"type\": \"table\",\r\n      \"layout\": { \"row\": 3, \"column\": 1, \"span\": 2 }\r\n    },\r\n    {\r\n      \"id\": \"KEY_PHRASES\",\r\n      \"name\": \"Key Phrases\",\r\n      \"type\": \"wordcloud\",\r\n      \"layout\": { \"row\": 3, \"column\": 2, \"height\": 44.5 }\r\n    }\r\n  ]\r\n}",
     "backendWebSiteResourceName": "[format('api-{0}', variables('solutionSuffix'))]",
-    "webSiteResourceName": "[format('app-{0}', variables('solutionSuffix'))]",
-    "roleId_AzureAIUser": "53ca6127-db72-4b80-b1b0-d745d6d5456d",
-    "roleId_AzureAIDeveloper": "64702f94-c441-49e6-a78b-ef80e0188fee",
-    "roleId_CognitiveServicesOpenAIUser": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd",
-    "roleId_SearchServiceContributor": "7ca78c08-252a-4471-8644-bb5ff32d4ba0",
-    "roleId_SearchIndexDataContributor": "8ebe5a00-799e-43f5-93ac-243d3dce84a7",
-    "roleId_SearchIndexDataReader": "1407120a-92aa-4202-b7e9-c0e197c71c8f",
-    "roleId_StorageBlobDataContributor": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
-    "roleId_StorageAccountContributor": "17d1049b-9a84-46fb-8f53-869881c3d3ab",
-    "roleId_StorageFileDataPrivilegedContributor": "69566ab7-960f-475b-8e7c-b3118f30c6bd",
-    "roleId_StorageBlobDelegator": "db58b8e5-c6ad-4a2a-8342-4190687cbf4a",
-    "cosmosBuiltinDataContributorRoleId": "00000000-0000-0000-0000-000000000002"
+    "webSiteResourceName": "[format('app-{0}', variables('solutionSuffix'))]"
   },
   "resources": {
     "resourceGroupTags": {
@@ -480,7 +420,7 @@
       "apiVersion": "2025-04-01",
       "name": "default",
       "properties": {
-        "tags": "[union(variables('existingTags'), variables('allTags'), createObject('TemplateName', 'KM-Generic', 'Type', if(parameters('enablePrivateNetworking'), 'WAF', 'Non-WAF'), 'CreatedBy', parameters('createdBy'), 'DeploymentName', deployment().name, 'UseCase', parameters('usecase')))]"
+        "tags": "[union(variables('existingTags'), parameters('tags'), createObject('TemplateName', 'KM-Generic', 'Type', if(parameters('enablePrivateNetworking'), 'WAF', 'Non-WAF'), 'CreatedBy', parameters('createdBy'), 'DeploymentName', deployment().name, 'UseCase', parameters('usecase')))]"
       }
     },
     "avmTelemetry": {
@@ -580,7 +520,7 @@
             "value": "[variables('logAnalyticsWorkspaceResourceName')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -610,7 +550,7 @@
           "replication": "[if(parameters('enableRedundancy'), createObject('value', createObject('enabled', true(), 'location', variables('replicaLocation'))), createObject('value', null()))]",
           "publicNetworkAccessForIngestion": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]",
           "publicNetworkAccessForQuery": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]",
-          "dataSources": "[if(parameters('enablePrivateNetworking'), createObject('value', createArray(createObject('tags', variables('allTags'), 'eventLogName', 'Application', 'eventTypes', createArray(createObject('eventType', 'Error'), createObject('eventType', 'Warning'), createObject('eventType', 'Information')), 'kind', 'WindowsEvent', 'name', 'applicationEvent'), createObject('counterName', '% Processor Time', 'instanceName', '*', 'intervalSeconds', 60, 'kind', 'WindowsPerformanceCounter', 'name', 'windowsPerfCounter1', 'objectName', 'Processor'), createObject('kind', 'IISLogs', 'name', 'sampleIISLog1', 'state', 'OnPremiseEnabled'))), createObject('value', null()))]"
+          "dataSources": "[if(parameters('enablePrivateNetworking'), createObject('value', createArray(createObject('tags', parameters('tags'), 'eventLogName', 'Application', 'eventTypes', createArray(createObject('eventType', 'Error'), createObject('eventType', 'Warning'), createObject('eventType', 'Information')), 'kind', 'WindowsEvent', 'name', 'applicationEvent'), createObject('counterName', '% Processor Time', 'instanceName', '*', 'intervalSeconds', 60, 'kind', 'WindowsPerformanceCounter', 'name', 'windowsPerfCounter1', 'objectName', 'Processor'), createObject('kind', 'IISLogs', 'name', 'sampleIISLog1', 'state', 'OnPremiseEnabled'))), createObject('value', null()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -3707,7 +3647,7 @@
             "value": "[variables('applicationInsightsResourceName')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -3727,7 +3667,8 @@
           "flowType": {
             "value": "Bluefield"
           },
-          "workspaceResourceId": "[if(parameters('enableMonitoring'), if(variables('useExistingLogAnalytics'), createObject('value', parameters('existingLogAnalyticsWorkspaceId')), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value)), createObject('value', ''))]"
+          "workspaceResourceId": "[if(parameters('enableMonitoring'), if(variables('useExistingLogAnalytics'), createObject('value', parameters('existingLogAnalyticsWorkspaceId')), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value)), createObject('value', ''))]",
+          "diagnosticSettings": "[if(parameters('enableMonitoring'), createObject('value', createArray(createObject('workspaceResourceId', if(variables('useExistingLogAnalytics'), parameters('existingLogAnalyticsWorkspaceId'), reference('logAnalyticsWorkspace').outputs.resourceId.value)))), createObject('value', null()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -4476,7 +4417,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "logAnalyticsWorkspaceId": "[if(variables('useExistingLogAnalytics'), createObject('value', parameters('existingLogAnalyticsWorkspaceId')), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value))]",
           "resourceSuffix": {
@@ -7342,7 +7283,7 @@
             ]
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -9072,7 +9013,7 @@
             "value": "[coalesce(parameters('vmAdminPassword'), 'JumpboxAdminP@ssw0rd1234!')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "availabilityZone": {
             "value": -1
@@ -18202,7 +18143,7 @@
             "value": "[variables('privateDnsZones')[copyIndex()]]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -21577,7 +21518,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -22069,7 +22010,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -22562,7 +22503,7 @@
             "value": "[parameters('aiServiceLocation')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "existingFoundryProjectResourceId": {
             "value": "[parameters('existingAiFoundryAiProjectResourceId')]"
@@ -27609,7 +27550,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "privateLinkServiceConnections": {
             "value": [
@@ -28358,9 +28299,9 @@
       },
       "dependsOn": [
         "aiFoundryAiServices",
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
         "virtualNetwork"
       ]
     },
@@ -28381,7 +28322,7 @@
             "value": "[parameters('contentUnderstandingLocation')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -30907,7 +30848,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "privateLinkServiceConnections": {
             "value": [
@@ -31655,9 +31596,9 @@
         }
       },
       "dependsOn": [
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
         "cognitiveServicesCu",
         "virtualNetwork"
       ]
@@ -31751,7 +31692,7 @@
             "value": "free"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "publicNetworkAccess": {
             "value": "Enabled"
@@ -34020,7 +33961,7 @@
             "value": "[parameters('enableTelemetry')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableHierarchicalNamespace": {
             "value": true
@@ -41993,9 +41934,9 @@
         }
       },
       "dependsOn": [
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageDfs)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageFile)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageQueue)]",
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageDfs)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageBlob)]",
         "userAssignedIdentity",
         "virtualNetwork"
@@ -42018,7 +41959,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -48003,7 +47944,7 @@
           "publicNetworkAccess": "[if(parameters('enablePrivateNetworking'), createObject('value', 'Disabled'), createObject('value', 'Enabled'))]",
           "firewallRules": "[if(not(parameters('enablePrivateNetworking')), createObject('value', createArray(createObject('endIpAddress', '255.255.255.255', 'name', 'AllowSpecificRange', 'startIpAddress', '0.0.0.0'), createObject('endIpAddress', '0.0.0.0', 'name', 'AllowAllWindowsAzureIps', 'startIpAddress', '0.0.0.0'))), createObject('value', createArray()))]",
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           }
         },
         "template": {
@@ -54508,7 +54449,7 @@
             "value": "[parameters('location')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -55163,7 +55104,7 @@
             "value": "[variables('webServerFarmResourceName')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[parameters('tags')]"
           },
           "enableTelemetry": {
             "value": "[parameters('enableTelemetry')]"
@@ -55720,186 +55661,6 @@
         "logAnalyticsWorkspace"
       ]
     },
-    "backendAcrPullRole": {
-      "condition": "[and(parameters('useManagedIdentityForAcrPull'), not(empty(parameters('containerRegistryNameForAcrPull'))))]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.acr-pull.backend.{0}', parameters('containerRegistryNameForAcrPull')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "acrName": {
-            "value": "[parameters('containerRegistryNameForAcrPull')]"
-          },
-          "principalId": {
-            "value": "[reference('backendUserAssignedIdentity').outputs.principalId.value]"
-          },
-          "principalType": {
-            "value": "ServicePrincipal"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "12749443456278264636"
-            }
-          },
-          "parameters": {
-            "acrName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the existing Azure Container Registry."
-              }
-            },
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the identity to grant AcrPull to."
-              }
-            },
-            "principalType": {
-              "type": "string",
-              "defaultValue": "ServicePrincipal",
-              "allowedValues": [
-                "ServicePrincipal",
-                "User",
-                "Group",
-                "Device",
-                "ForeignGroup"
-              ],
-              "metadata": {
-                "description": "Optional. Principal type for the role assignment."
-              }
-            }
-          },
-          "variables": {
-            "acrPullRoleDefinitionId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
-              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId'))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "principalType": "[parameters('principalType')]",
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionId'))]"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the role assignment."
-              },
-              "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "backendUserAssignedIdentity"
-      ]
-    },
-    "frontendAcrPullRole": {
-      "condition": "[and(parameters('useManagedIdentityForAcrPull'), not(empty(parameters('containerRegistryNameForAcrPull'))))]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.acr-pull.frontend.{0}', parameters('containerRegistryNameForAcrPull')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "acrName": {
-            "value": "[parameters('containerRegistryNameForAcrPull')]"
-          },
-          "principalId": {
-            "value": "[reference('userAssignedIdentity').outputs.principalId.value]"
-          },
-          "principalType": {
-            "value": "ServicePrincipal"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "12749443456278264636"
-            }
-          },
-          "parameters": {
-            "acrName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the existing Azure Container Registry."
-              }
-            },
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the identity to grant AcrPull to."
-              }
-            },
-            "principalType": {
-              "type": "string",
-              "defaultValue": "ServicePrincipal",
-              "allowedValues": [
-                "ServicePrincipal",
-                "User",
-                "Group",
-                "Device",
-                "ForeignGroup"
-              ],
-              "metadata": {
-                "description": "Optional. Principal type for the role assignment."
-              }
-            }
-          },
-          "variables": {
-            "acrPullRoleDefinitionId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
-              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId'))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "principalType": "[parameters('principalType')]",
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionId'))]"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the role assignment."
-              },
-              "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "userAssignedIdentity"
-      ]
-    },
     "webSiteBackend": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -55914,13 +55675,13 @@
             "value": "[variables('backendWebSiteResourceName')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[union(parameters('tags'), createObject('azd-service-name', 'api'))]"
           },
           "location": {
             "value": "[parameters('location')]"
           },
           "kind": {
-            "value": "app,linux,container"
+            "value": "app,linux"
           },
           "serverFarmResourceId": {
             "value": "[tryGet(reference('webServerFarm'), 'outputs', 'resourceId', 'value')]"
@@ -55935,9 +55696,10 @@
           },
           "siteConfig": {
             "value": {
-              "linuxFxVersion": "[format('DOCKER|{0}/{1}:{2}', parameters('backendContainerRegistryHostname'), parameters('backendContainerImageName'), parameters('backendContainerImageTag'))]",
+              "linuxFxVersion": "PYTHON|3.11",
               "minTlsVersion": "1.2",
-              "acrUseManagedIdentityCreds": "[or(parameters('useManagedIdentityForAcrPull'), not(empty(parameters('containerRegistryNameForAcrPull'))))]"
+              "alwaysOn": true,
+              "appCommandLine": "uvicorn app:app --host 0.0.0.0 --port 8000"
             }
           },
           "configs": {
@@ -55945,13 +55707,10 @@
               {
                 "name": "appsettings",
                 "properties": {
+                  "SCM_DO_BUILD_DURING_DEPLOYMENT": "true",
+                  "ENABLE_ORYX_BUILD": "true",
+                  "PYTHONUNBUFFERED": "1",
                   "REACT_APP_LAYOUT_CONFIG": "[variables('reactAppLayoutConfig')]",
-                  "AGENT_NAME_CONVERSATION": "[if(not(empty(parameters('agentNameConversation'))), parameters('agentNameConversation'), format('KM-ConversationAgent-{0}', variables('solutionSuffix')))]",
-                  "AGENT_NAME_TITLE": "[if(not(empty(parameters('agentNameTitle'))), parameters('agentNameTitle'), format('KM-TitleAgent-{0}', variables('solutionSuffix')))]",
-                  "MODEL_FILTER_ALLOWED_PUBLISHERS": "[parameters('modelFilterAllowedPublishers')]",
-                  "MODEL_FILTER_REQUIRE_FUNCTION_CALLING": "[parameters('modelFilterRequireFunctionCalling')]",
-                  "API_APP_NAME": "[format('api-{0}', variables('solutionSuffix'))]",
-                  "AI_FOUNDRY_RESOURCE_ID": "[reference('aiFoundryAiServices').outputs.resourceId.value]",
                   "AZURE_AI_AGENT_ENDPOINT": "[if(not(empty(variables('existingProjEndpoint'))), variables('existingProjEndpoint'), reference('aiFoundryAiServices').outputs.aiProjectInfo.value.apiEndpoint)]",
                   "AZURE_AI_AGENT_API_VERSION": "[parameters('azureAiAgentApiVersion')]",
                   "AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME": "[parameters('gptModelName')]",
@@ -55965,7 +55724,7 @@
                   "SQLDB_USER_MID": "[reference('backendUserAssignedIdentity').outputs.clientId.value]",
                   "AZURE_AI_SEARCH_ENDPOINT": "[format('https://{0}.search.windows.net', variables('aiSearchName'))]",
                   "AZURE_AI_SEARCH_INDEX": "call_transcripts_index",
-                  "AZURE_AI_SEARCH_CONNECTION_NAME": "[variables('aiSearchConnectionName')]",
+                  "AZURE_AI_SEARCH_CONNECTION_NAME": "[variables('aiSearchName')]",
                   "USE_AI_PROJECT_CLIENT": "True",
                   "DISPLAY_CHART_DEFAULT": "False",
                   "APPLICATIONINSIGHTS_CONNECTION_STRING": "[if(parameters('enableMonitoring'), reference('applicationInsights').outputs.connectionString.value, '')]",
@@ -57874,7 +57633,6 @@
         "aiFoundryAiServices",
         "applicationInsights",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').webApp)]",
-        "backendAcrPullRole",
         "backendUserAssignedIdentity",
         "cosmosDb",
         "logAnalyticsWorkspace",
@@ -57897,28 +57655,23 @@
             "value": "[variables('webSiteResourceName')]"
           },
           "tags": {
-            "value": "[variables('allTags')]"
+            "value": "[union(parameters('tags'), createObject('azd-service-name', 'webapp'))]"
           },
           "location": {
             "value": "[parameters('location')]"
           },
           "kind": {
-            "value": "app,linux,container"
+            "value": "app,linux"
           },
           "serverFarmResourceId": {
             "value": "[reference('webServerFarm').outputs.resourceId.value]"
           },
-          "managedIdentities": {
-            "value": {
-              "systemAssigned": true,
-              "userAssignedResourceIds": "[if(parameters('useManagedIdentityForAcrPull'), createArray(reference('userAssignedIdentity').outputs.resourceId.value), createArray())]"
-            }
-          },
           "siteConfig": {
             "value": {
-              "linuxFxVersion": "[format('DOCKER|{0}/{1}:{2}', parameters('frontendContainerRegistryHostname'), parameters('frontendContainerImageName'), parameters('frontendContainerImageTag'))]",
+              "linuxFxVersion": "NODE|20-lts",
               "minTlsVersion": "1.2",
-              "acrUseManagedIdentityCreds": "[or(parameters('useManagedIdentityForAcrPull'), not(empty(parameters('containerRegistryNameForAcrPull'))))]"
+              "alwaysOn": true,
+              "appCommandLine": "pm2 serve /home/site/wwwroot/build --no-daemon --spa"
             }
           },
           "configs": {
@@ -57926,6 +57679,10 @@
               {
                 "name": "appsettings",
                 "properties": {
+                  "SCM_DO_BUILD_DURING_DEPLOYMENT": "true",
+                  "ENABLE_ORYX_BUILD": "true",
+                  "REACT_APP_API_BASE_URL": "[if(parameters('enablePrivateNetworking'), '', format('https://api-{0}.azurewebsites.net', variables('solutionSuffix')))]",
+                  "WEBSITE_NODE_DEFAULT_VERSION": "~20",
                   "APP_API_BASE_URL": "[if(parameters('enablePrivateNetworking'), '', format('https://api-{0}.azurewebsites.net', variables('solutionSuffix')))]",
                   "BACKEND_API_HOST": "[if(parameters('enablePrivateNetworking'), format('api-{0}.azurewebsites.net', variables('solutionSuffix')), '')]"
                 },
@@ -59825,804 +59582,9 @@
       },
       "dependsOn": [
         "applicationInsights",
-        "frontendAcrPullRole",
         "logAnalyticsWorkspace",
-        "userAssignedIdentity",
         "virtualNetwork",
         "webServerFarm"
-      ]
-    },
-    "backendWebSiteSamiMirror": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.sami-mirror.{0}', variables('backendWebSiteResourceName')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "appServiceName": {
-            "value": "[variables('backendWebSiteResourceName')]"
-          },
-          "principalId": {
-            "value": "[reference('webSiteBackend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "aiFoundryAccountName": "[if(variables('useExistingAiFoundryAiProject'), createObject('value', ''), createObject('value', variables('aiFoundryAiServicesResourceName')))]",
-          "aiFoundryRoleIds": "[if(variables('useExistingAiFoundryAiProject'), createObject('value', createArray()), createObject('value', createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))))]",
-          "searchServiceName": {
-            "value": "[variables('aiSearchName')]"
-          },
-          "searchRoleIds": {
-            "value": [
-              "[variables('roleId_SearchIndexDataReader')]",
-              "[variables('roleId_SearchServiceContributor')]"
-            ]
-          },
-          "cosmosAccountName": {
-            "value": "[variables('cosmosDbResourceName')]"
-          },
-          "cosmosRoleIds": {
-            "value": [
-              "[variables('cosmosBuiltinDataContributorRoleId')]"
-            ]
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "5562780721457463268"
-            }
-          },
-          "parameters": {
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the App Service system-assigned managed identity."
-              }
-            },
-            "appServiceName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the target App Service. Used only to disambiguate deployment names."
-              }
-            },
-            "aiFoundryAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the AI Foundry / Cognitive Services account to grant roles on."
-              }
-            },
-            "aiFoundryRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the AI Foundry account."
-              }
-            },
-            "aiFoundryCuAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the AI Foundry Content Understanding account to grant roles on."
-              }
-            },
-            "aiFoundryCuRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the AI Foundry CU account."
-              }
-            },
-            "searchServiceName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Azure AI Search service to grant roles on."
-              }
-            },
-            "searchRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the search service."
-              }
-            },
-            "storageAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Storage account to grant roles on."
-              }
-            },
-            "storageRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the storage account."
-              }
-            },
-            "cosmosAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Cosmos DB account to grant the built-in Cosmos DB Data Contributor data-plane role on."
-              }
-            },
-            "cosmosRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Cosmos DB data-plane role definition GUIDs (relative). Defaults to the built-in Data Contributor."
-              }
-            }
-          },
-          "resources": [
-            {
-              "copy": {
-                "name": "aiFoundryAssignments",
-                "count": "[length(parameters('aiFoundryRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('aiFoundryAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiFoundryAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('aiFoundryAccountName'), parameters('principalId'), parameters('aiFoundryRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('aiFoundryRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "aiFoundryCuAssignments",
-                "count": "[length(parameters('aiFoundryCuRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('aiFoundryCuAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiFoundryCuAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('aiFoundryCuAccountName'), parameters('principalId'), parameters('aiFoundryCuRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('aiFoundryCuRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "searchAssignments",
-                "count": "[length(parameters('searchRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('searchServiceName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Search/searchServices', parameters('searchServiceName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('searchServiceName'), parameters('principalId'), parameters('searchRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('searchRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "storageAssignments",
-                "count": "[length(parameters('storageRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('storageAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('storageAccountName'), parameters('principalId'), parameters('storageRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('storageRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "cosmosAssignments",
-                "count": "[length(parameters('cosmosRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('cosmosAccountName')))]",
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
-              "apiVersion": "2024-05-15",
-              "name": "[format('{0}/{1}', parameters('cosmosAccountName'), guid('sami-mirror', parameters('appServiceName'), parameters('cosmosAccountName'), parameters('principalId'), parameters('cosmosRoleIds')[copyIndex()]))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "roleDefinitionId": "[format('{0}/sqlRoleDefinitions/{1}', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')), parameters('cosmosRoleIds')[copyIndex()])]",
-                "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName'))]"
-              }
-            }
-          ]
-        }
-      },
-      "dependsOn": [
-        "cosmosDb",
-        "searchServiceUpdate",
-        "webSiteBackend"
-      ]
-    },
-    "backendWebSiteSamiOnExistingAiFoundry": {
-      "copy": {
-        "name": "backendWebSiteSamiOnExistingAiFoundry",
-        "count": "[length(createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser')))]"
-      },
-      "condition": "[variables('useExistingAiFoundryAiProject')]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.ra.beSami-aiFoundry.{0}', createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))[copyIndex()]), 64)]",
-      "subscriptionId": "[variables('aiFoundryAiServicesSubscriptionId')]",
-      "resourceGroup": "[variables('aiFoundryAiServicesResourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "principalId": {
-            "value": "[reference('webSiteBackend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "roleDefinitionId": {
-            "value": "[createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))[copyIndex()]]"
-          },
-          "targetResourceName": {
-            "value": "[format('{0}-beSami', variables('aiFoundryAiServicesResourceName'))]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "5940276677595603323"
-            }
-          },
-          "parameters": {
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "The principal ID to assign the role to"
-              }
-            },
-            "roleDefinitionId": {
-              "type": "string",
-              "metadata": {
-                "description": "The role definition ID to assign"
-              }
-            },
-            "targetResourceName": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the target resource"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "name": "[guid(parameters('principalId'), parameters('roleDefinitionId'), parameters('targetResourceName'))]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.Authorization/roleAssignments', guid(parameters('principalId'), parameters('roleDefinitionId'), parameters('targetResourceName')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "webSiteBackend"
-      ]
-    },
-    "backendWebSiteSamiAcrPullRole": {
-      "condition": "[not(empty(parameters('containerRegistryNameForAcrPull')))]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.acr-pull.sami.backend.{0}', parameters('containerRegistryNameForAcrPull')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "acrName": {
-            "value": "[parameters('containerRegistryNameForAcrPull')]"
-          },
-          "principalId": {
-            "value": "[reference('webSiteBackend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "principalType": {
-            "value": "ServicePrincipal"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "12749443456278264636"
-            }
-          },
-          "parameters": {
-            "acrName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the existing Azure Container Registry."
-              }
-            },
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the identity to grant AcrPull to."
-              }
-            },
-            "principalType": {
-              "type": "string",
-              "defaultValue": "ServicePrincipal",
-              "allowedValues": [
-                "ServicePrincipal",
-                "User",
-                "Group",
-                "Device",
-                "ForeignGroup"
-              ],
-              "metadata": {
-                "description": "Optional. Principal type for the role assignment."
-              }
-            }
-          },
-          "variables": {
-            "acrPullRoleDefinitionId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
-              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId'))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "principalType": "[parameters('principalType')]",
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionId'))]"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the role assignment."
-              },
-              "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "webSiteBackend"
-      ]
-    },
-    "frontendWebSiteSamiMirror": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.sami-mirror.{0}', variables('webSiteResourceName')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "appServiceName": {
-            "value": "[variables('webSiteResourceName')]"
-          },
-          "principalId": {
-            "value": "[reference('webSiteFrontend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "aiFoundryAccountName": "[if(variables('useExistingAiFoundryAiProject'), createObject('value', ''), createObject('value', variables('aiFoundryAiServicesResourceName')))]",
-          "aiFoundryRoleIds": "[if(variables('useExistingAiFoundryAiProject'), createObject('value', createArray()), createObject('value', createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))))]",
-          "aiFoundryCuAccountName": {
-            "value": "[variables('aiServicesNameCu')]"
-          },
-          "aiFoundryCuRoleIds": {
-            "value": [
-              "[variables('roleId_AzureAIUser')]"
-            ]
-          },
-          "searchServiceName": {
-            "value": "[variables('aiSearchName')]"
-          },
-          "searchRoleIds": {
-            "value": [
-              "[variables('roleId_SearchServiceContributor')]",
-              "[variables('roleId_CognitiveServicesOpenAIUser')]",
-              "[variables('roleId_SearchIndexDataContributor')]",
-              "[variables('roleId_SearchIndexDataReader')]"
-            ]
-          },
-          "storageAccountName": {
-            "value": "[variables('storageAccountName')]"
-          },
-          "storageRoleIds": {
-            "value": [
-              "[variables('roleId_StorageBlobDataContributor')]",
-              "[variables('roleId_StorageAccountContributor')]",
-              "[variables('roleId_StorageFileDataPrivilegedContributor')]",
-              "[variables('roleId_StorageBlobDelegator')]"
-            ]
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "5562780721457463268"
-            }
-          },
-          "parameters": {
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the App Service system-assigned managed identity."
-              }
-            },
-            "appServiceName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the target App Service. Used only to disambiguate deployment names."
-              }
-            },
-            "aiFoundryAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the AI Foundry / Cognitive Services account to grant roles on."
-              }
-            },
-            "aiFoundryRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the AI Foundry account."
-              }
-            },
-            "aiFoundryCuAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the AI Foundry Content Understanding account to grant roles on."
-              }
-            },
-            "aiFoundryCuRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the AI Foundry CU account."
-              }
-            },
-            "searchServiceName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Azure AI Search service to grant roles on."
-              }
-            },
-            "searchRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the search service."
-              }
-            },
-            "storageAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Storage account to grant roles on."
-              }
-            },
-            "storageRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Role definition IDs (GUIDs) to grant on the storage account."
-              }
-            },
-            "cosmosAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional. Name of the Cosmos DB account to grant the built-in Cosmos DB Data Contributor data-plane role on."
-              }
-            },
-            "cosmosRoleIds": {
-              "type": "array",
-              "defaultValue": [],
-              "metadata": {
-                "description": "Optional. Cosmos DB data-plane role definition GUIDs (relative). Defaults to the built-in Data Contributor."
-              }
-            }
-          },
-          "resources": [
-            {
-              "copy": {
-                "name": "aiFoundryAssignments",
-                "count": "[length(parameters('aiFoundryRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('aiFoundryAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiFoundryAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('aiFoundryAccountName'), parameters('principalId'), parameters('aiFoundryRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('aiFoundryRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "aiFoundryCuAssignments",
-                "count": "[length(parameters('aiFoundryCuRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('aiFoundryCuAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiFoundryCuAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('aiFoundryCuAccountName'), parameters('principalId'), parameters('aiFoundryCuRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('aiFoundryCuRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "searchAssignments",
-                "count": "[length(parameters('searchRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('searchServiceName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Search/searchServices', parameters('searchServiceName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('searchServiceName'), parameters('principalId'), parameters('searchRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('searchRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "storageAssignments",
-                "count": "[length(parameters('storageRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('storageAccountName')))]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
-              "name": "[guid('sami-mirror', parameters('appServiceName'), parameters('storageAccountName'), parameters('principalId'), parameters('storageRoleIds')[copyIndex()])]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('storageRoleIds')[copyIndex()])]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            },
-            {
-              "copy": {
-                "name": "cosmosAssignments",
-                "count": "[length(parameters('cosmosRoleIds'))]"
-              },
-              "condition": "[not(empty(parameters('cosmosAccountName')))]",
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
-              "apiVersion": "2024-05-15",
-              "name": "[format('{0}/{1}', parameters('cosmosAccountName'), guid('sami-mirror', parameters('appServiceName'), parameters('cosmosAccountName'), parameters('principalId'), parameters('cosmosRoleIds')[copyIndex()]))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "roleDefinitionId": "[format('{0}/sqlRoleDefinitions/{1}', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')), parameters('cosmosRoleIds')[copyIndex()])]",
-                "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName'))]"
-              }
-            }
-          ]
-        }
-      },
-      "dependsOn": [
-        "searchServiceUpdate",
-        "storageAccount",
-        "webSiteFrontend"
-      ]
-    },
-    "frontendWebSiteSamiOnExistingAiFoundry": {
-      "copy": {
-        "name": "frontendWebSiteSamiOnExistingAiFoundry",
-        "count": "[length(createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser')))]"
-      },
-      "condition": "[variables('useExistingAiFoundryAiProject')]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.ra.feSami-aiFoundry.{0}', createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))[copyIndex()]), 64)]",
-      "subscriptionId": "[variables('aiFoundryAiServicesSubscriptionId')]",
-      "resourceGroup": "[variables('aiFoundryAiServicesResourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "principalId": {
-            "value": "[reference('webSiteFrontend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "roleDefinitionId": {
-            "value": "[createArray(variables('roleId_AzureAIUser'), variables('roleId_AzureAIDeveloper'), variables('roleId_CognitiveServicesOpenAIUser'))[copyIndex()]]"
-          },
-          "targetResourceName": {
-            "value": "[format('{0}-feSami', variables('aiFoundryAiServicesResourceName'))]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "5940276677595603323"
-            }
-          },
-          "parameters": {
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "The principal ID to assign the role to"
-              }
-            },
-            "roleDefinitionId": {
-              "type": "string",
-              "metadata": {
-                "description": "The role definition ID to assign"
-              }
-            },
-            "targetResourceName": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the target resource"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "name": "[guid(parameters('principalId'), parameters('roleDefinitionId'), parameters('targetResourceName'))]",
-              "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
-                "principalId": "[parameters('principalId')]",
-                "principalType": "ServicePrincipal"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.Authorization/roleAssignments', guid(parameters('principalId'), parameters('roleDefinitionId'), parameters('targetResourceName')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "webSiteFrontend"
-      ]
-    },
-    "frontendWebSiteSamiAcrPullRole": {
-      "condition": "[not(empty(parameters('containerRegistryNameForAcrPull')))]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('module.acr-pull.sami.frontend.{0}', parameters('containerRegistryNameForAcrPull')), 64)]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "acrName": {
-            "value": "[parameters('containerRegistryNameForAcrPull')]"
-          },
-          "principalId": {
-            "value": "[reference('webSiteFrontend').outputs.systemAssignedMIPrincipalId.value]"
-          },
-          "principalType": {
-            "value": "ServicePrincipal"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.40.2.10011",
-              "templateHash": "12749443456278264636"
-            }
-          },
-          "parameters": {
-            "acrName": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Name of the existing Azure Container Registry."
-              }
-            },
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "Required. Principal ID (objectId) of the identity to grant AcrPull to."
-              }
-            },
-            "principalType": {
-              "type": "string",
-              "defaultValue": "ServicePrincipal",
-              "allowedValues": [
-                "ServicePrincipal",
-                "User",
-                "Group",
-                "Device",
-                "ForeignGroup"
-              ],
-              "metadata": {
-                "description": "Optional. Principal type for the role assignment."
-              }
-            }
-          },
-          "variables": {
-            "acrPullRoleDefinitionId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
-              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId'))]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "principalType": "[parameters('principalType')]",
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionId'))]"
-              }
-            }
-          ],
-          "outputs": {
-            "roleAssignmentId": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the role assignment."
-              },
-              "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), parameters('principalId'), variables('acrPullRoleDefinitionId')))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "webSiteFrontend"
       ]
     }
   },
@@ -60823,6 +59785,13 @@
       },
       "value": "[format('{0}{1}', reference('sqlDBModule').outputs.name.value, environment().suffixes.sqlServerHostname)]"
     },
+    "USER_MID": {
+      "type": "string",
+      "metadata": {
+        "description": "Client ID of the user-assigned managed identity."
+      },
+      "value": "[reference('userAssignedIdentity').outputs.clientId.value]"
+    },
     "BACKEND_USER_MID_NAME": {
       "type": "string",
       "metadata": {
@@ -60885,6 +59854,13 @@
         "description": "Contains Azure environment image tag."
       },
       "value": "[parameters('backendContainerImageTag')]"
+    },
+    "AZURE_EXISTING_AIPROJECT_RESOURCE_ID": {
+      "type": "string",
+      "metadata": {
+        "description": "Contains existing AI project resource ID."
+      },
+      "value": "[parameters('existingAiFoundryAiProjectResourceId')]"
     },
     "APPLICATIONINSIGHTS_CONNECTION_STRING": {
       "type": "string",
@@ -60954,14 +59930,14 @@
       "metadata": {
         "description": "Contains Conversation Agent name."
       },
-      "value": "[if(not(empty(parameters('agentNameConversation'))), parameters('agentNameConversation'), format('KM-ConversationAgent-{0}', variables('solutionSuffix')))]"
+      "value": ""
     },
     "AGENT_NAME_TITLE": {
       "type": "string",
       "metadata": {
         "description": "Contains Title Agent name."
       },
-      "value": "[if(not(empty(parameters('agentNameTitle'))), parameters('agentNameTitle'), format('KM-TitleAgent-{0}', variables('solutionSuffix')))]"
+      "value": ""
     },
     "USE_CASE": {
       "type": "string",

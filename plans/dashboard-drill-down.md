@@ -227,6 +227,13 @@ All three previously-open questions have been resolved with the plan's default a
    - No Cosmos container, no per-user list, no localStorage fallback in v1. Re-evaluate after telemetry shows whether managers paste/bookmark hash URLs (`DrillOpened`, `CrossFilterApplied` events with `referrer === 'hash'` flag).
    - Implication: `c-saved-views-stretch` is **cut from scope**, not merely deferred. Removed from the Stage C task list below.
 
+4. **Click matrix changes between Stage B and Stage C** — **Decision: plain click = cross-filter; explicit "▶ Investigate" button = drill drawer.**
+   - In Stage B, a plain click on any chart mark (donut slice, bar, table row, key-phrase word) opened the drill drawer. In Stage C this changes: **plain click cross-filters the dashboard**; the drill drawer is opened via an explicit "▶ Investigate" button per chart tile (hover-reveal on pointer, always visible on touch via `@media (hover: none)`).
+   - Rationale: cross-filtering is the higher-frequency action ("show me only Billing-related calls across all widgets"); drilling is the deeper, less frequent action ("now zoom into the time trend"). Power BI uses the same precedence model and managers told us in usability discussions that they want the dashboard to respond to a single click rather than always opening an overlay.
+   - Keyboard parity: `Enter` / `Space` on a focused chart mark also dispatches cross-filter (not drill). The Investigate button is `Tab`-reachable.
+   - Implication: this is a **behavioural change** for anyone who used Stage B in the wild for a few weeks. Call it out in `Emm-Demo-prompts.md` and `documents/TechnicalArchitecture.md` so demo scripts and any internal training material are updated.
+   - Implementation: lives in `c-frontend-crossfilter` (re-wires Chart.tsx click handlers) + `c-frontend-investigate-btn` (adds the new button). The Stage B drill drawer itself (`DrillDrawer.tsx`, `drillSlice`, `/api/drill/*`) is unchanged except for the new "Ask AI about this" header button.
+
 ---
 
 ## Task list

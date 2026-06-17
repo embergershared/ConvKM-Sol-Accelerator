@@ -12,7 +12,7 @@ import {
   DrawerFooter,
   Tag,
 } from "@fluentui/react-components";
-import { ArrowLeftRegular, DismissRegular } from "@fluentui/react-icons";
+import { ArrowLeftRegular, DismissRegular, SparkleRegular } from "@fluentui/react-icons";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import {
   closeDrill,
@@ -20,7 +20,11 @@ import {
   popToDepth,
   resetDrill,
 } from "../../state/slices/drillSlice";
+import { startNewConversation } from "../../state/slices/appSlice";
 import { encodeDrillStack } from "../../utils/drillHash";
+import { dispatchAskAI } from "../../utils/chatBridge";
+import { buildPromptForStack } from "../../configs/drillPrompts";
+import { trackDrillEvent } from "../../utils/drillTelemetry";
 import TimeTrendChart from "./TimeTrendChart";
 import CallList from "./CallList";
 import CallTranscript from "./CallTranscript";
@@ -59,12 +63,62 @@ function labelForLevel(level: DrillLevel): string {
   }
 }
 
-const DrillDrawer: React.FC = () => {
+const DrillDrawer: React.FC<{ onRequestShowChat?: () => void }> = ({
+  onRequestShowChat,
+}) => {
   const dispatch = useAppDispatch();
   const isOpen = useAppSelector((s) => s.drill.isOpen);
   const stack = useAppSelector((s) => s.drill.stack);
+  const call = useAppSelector((s) => s.drill.call);
 
   const top = stack[stack.length - 1];
+  // At L3, the "Ask AI" button shouldn't dispatch until the transcript has
+  // loaded — otherwise the prompt falls back to a generic per-topic version
+  // and the user loses the per-call specificity they asked for.
+  const askAIDisabled =
+    stack.length === 0 ||
+    (top?.kind === "transcript" && (!call || !call.transcript_raw));
+
+  const handleAskAI = useCallback(() => {
+    if (!stack.length) return;
+    if (top?.kind === "transcript" && (!call || !call.transcript_raw)) {
+      return;
+    }
+    const prompt = buildPromptForStack(stack, call ?? undefined);
+    if (!prompt) return;
+    const level = top?.kind ?? "timeseries";
+    const selectionLevel = [...stack]
+      .reverse()
+      .find((l) => l.kind !== "transcript") as
+      | (DrillLevel & { kind: "timeseries" | "calls" })
+      | undefined;
+    trackDrillEvent("AIHandoffClicked", {
+      level,
+      dimension: selectionLevel?.selection.dimension,
+      value: selectionLevel?.selection.value,
+      conversationId:
+        top?.kind === "transcript" ? top.conversationId : undefined,
+    });
+    onRequestShowChat?.();
+    // Close the drill drawer — it overlays the right side of the layout where
+    // the Chat panel lives, so leaving it open hides the streamed reply.
+    // closeDrill preserves the drill stack (vs resetDrill); user can re-open
+    // from the URL hash or by clicking the chart mark again.
+    dispatch(closeDrill());
+    // Change conversation id BEFORE dispatching the prompt so useChatApi's
+    // existing abort-on-conversation-change effect tears down any in-flight
+    // stream. The chatBridge holds the request as "pending" if Chat hasn't
+    // mounted yet (panel was hidden); the first subscriber consumes it.
+    dispatch(startNewConversation());
+    dispatchAskAI({
+      prompt,
+      context: {
+        referrer: "drill",
+        level,
+        dimension: selectionLevel?.selection.dimension,
+      },
+    });
+  }, [call, dispatch, onRequestShowChat, stack, top]);
 
   // Resizable width — drag the handle on the left edge. Persisted to
   // localStorage so the user's preference survives sessions.
@@ -185,6 +239,20 @@ const DrillDrawer: React.FC = () => {
         <DrawerHeaderTitle
           action={
             <div style={{ display: "flex", gap: 4 }}>
+              <Button
+                appearance="primary"
+                size="small"
+                icon={<SparkleRegular />}
+                title={
+                  askAIDisabled && top?.kind === "transcript"
+                    ? "Waiting for transcript to load…"
+                    : "Seed the chat with a prompt about this drill view"
+                }
+                disabled={askAIDisabled}
+                onClick={handleAskAI}
+              >
+                Ask AI about this
+              </Button>
               <Button
                 appearance="subtle"
                 icon={<ArrowLeftRegular />}

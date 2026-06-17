@@ -23,6 +23,7 @@ import { fetchModelStatusOnce, fetchModels, pollModelStatus, selectModel } from 
 import { setUserMessage } from "../../state/slices/chatSlice";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useChatApi } from "../../hooks/useChatApi";
+import { subscribeAskAI } from "../../utils/chatBridge";
 import ChatMessageItem from "./ChatMessageItem";
 
 type ChatProps = {
@@ -151,6 +152,19 @@ const Chat: React.FC<ChatProps> = ({
 
     questionInputRef.current?.focus();
   }, [sendMessage, userMessage]);
+
+  // Subscribe to drill-drawer "Ask AI about this" requests. The dispatcher in
+  // DrillDrawer.tsx calls startNewConversation() before emitting, which
+  // triggers the in-flight stream abort in useChatApi.ts (the existing
+  // selectedConversationId-change effect). Once that abort settles on the
+  // next microtask, the handler below sends the seeded prompt.
+  useEffect(() => {
+    return subscribeAskAI(({ prompt }) => {
+      if (!prompt || !prompt.trim()) return;
+      dispatch(setUserMessage(prompt));
+      void sendMessage(prompt);
+    });
+  }, [dispatch, sendMessage]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {

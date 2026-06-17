@@ -64,4 +64,5 @@ export type CallDetail = {
   key_phrases: string[];
   summary: string;
   transcript_raw: string;      // raw processed_data.Content blob
+  audio_url?: string;          // SAS URL for call recording playback (if available)
 };
