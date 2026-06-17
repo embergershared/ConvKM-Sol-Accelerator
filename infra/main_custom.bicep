@@ -949,6 +949,11 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
         roleDefinitionIdOrName: 'Storage File Data Privileged Contributor'
         principalType: 'ServicePrincipal'
       }
+      {
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionIdOrName: 'Storage Blob Delegator'
+        principalType: 'ServicePrincipal'
+      }
     ]
     networkAcls: {
       bypass: 'AzureServices, Logging, Metrics'
@@ -1015,7 +1020,17 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
         ]
       : []
     blobServices: {
-      corsRules: []
+      corsRules: [
+        {
+          allowedOrigins: [
+            'https://app-${solutionSuffix}.azurewebsites.net'
+          ]
+          allowedMethods: [ 'GET', 'HEAD', 'OPTIONS' ]
+          allowedHeaders: [ '*' ]
+          exposedHeaders: [ 'Content-Length', 'Content-Type' ]
+          maxAgeInSeconds: 3600
+        }
+      ]
       deleteRetentionPolicyEnabled: false
       changeFeedEnabled: false
       restorePolicyEnabled: false
@@ -1352,6 +1367,7 @@ module webSiteBackend 'modules/web-sites.bicep' = {
           SOLUTION_NAME: solutionSuffix
           APP_ENV: 'Prod'
           AZURE_CLIENT_ID: backendUserAssignedIdentity.outputs.clientId
+          STORAGE_ACCOUNT_NAME: storageAccount.outputs.name
           AZURE_BASIC_LOGGING_LEVEL: 'INFO'
           AZURE_PACKAGE_LOGGING_LEVEL: 'WARNING'
           AZURE_LOGGING_PACKAGES: ''

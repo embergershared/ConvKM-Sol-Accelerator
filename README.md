@@ -167,6 +167,62 @@ deployment — they are explicit, opt-in operator actions.
 | `infra/scripts/agent_scripts/01_create_agents.py` | Creates the orchestrator + title agents in Foundry from `agent_instructions.py`. | First post-deploy, and after a portal change strips tools (see Guidance above). | See `infra/scripts/run_create_agents_scripts.sh`. |
 | `infra/scripts/agent_scripts/02_update_agents.py` | Re-publishes agent instructions while preserving the active model + tool bindings. | Whenever `agent_instructions.py` changes. | `python infra/scripts/agent_scripts/02_update_agents.py` |
 
+### Running `process_custom_data.sh` from WSL (Ubuntu)
+
+When running the custom data processing script from Windows Subsystem for Linux,
+you need the Microsoft ODBC Driver for SQL Server installed. Run these commands
+one at a time:
+
+```bash
+# 1. Import the Microsoft GPG signing key
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+
+# 2. Add the Microsoft package repository (Ubuntu 24.04)
+echo "deb [arch=amd64] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
+
+# 3. Update package lists
+sudo apt-get update
+
+# 4. Install the ODBC driver and unixODBC dev headers
+sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
+```
+
+> **Note:** If you are on Ubuntu 22.04, replace `24.04/prod noble` with
+> `22.04/prod jammy` in step 2.
+
+Then install the Python dependencies (use `--break-system-packages` if not in a
+native Linux venv):
+
+```bash
+python3 -m pip install --break-system-packages -r infra/scripts/index_scripts/requirements.txt
+```
+
+#### SQL Database access for your CLI identity
+
+The processing script authenticates to Azure SQL using your `az login` identity
+via a token. Your identity must be a user in the SQL database with write
+permissions. If you see `Login failed for user '<token-identified principal>'`,
+connect to the database (Azure Portal Query Editor or Azure Data Studio) and run:
+
+```sql
+CREATE USER [your-email@domain.com] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_owner ADD MEMBER [your-email@domain.com];
+```
+
+Replace `your-email@domain.com` with the output of
+`az account show --query user.name -o tsv`.
+
+#### Azure CLI token timeout in WSL
+
+The `AzureCliCredential` used by the processing scripts can time out in WSL
+because `az` runs on the Windows filesystem. Before running the script, warm up
+the token cache:
+
+```bash
+az account get-access-token --resource https://cognitiveservices.azure.com/ > /dev/null
+az account get-access-token --resource https://database.windows.net/.default > /dev/null
+```
+
 ## Resources
 
 | Product | Description | Tier / Expected Usage Notes | Cost |
