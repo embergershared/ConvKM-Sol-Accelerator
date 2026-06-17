@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import Chart from "./components/Chart/Chart";
 import Chat from "./components/Chat/Chat";
 import {
-  Avatar,
   Body2,
   Button,
   FluentProvider,
@@ -37,6 +36,7 @@ import DrillDrawer from "./components/Drill/DrillDrawer";
 import { AppLogo } from "./components/Svg/Svg";
 import CustomSpinner from "./components/CustomSpinner/CustomSpinner";
 import CitationPanel from "./components/CitationPanel/CitationPanel";
+import UserMenu from "./components/UserMenu/UserMenu";
 
 const panels = {
   DASHBOARD: "DASHBOARD",
@@ -305,9 +305,7 @@ const Dashboard: React.FC = () => {
           >
             {`${panelShowStates[panels.CHAT] ? "Hide" : "Show"} Chat`}
           </Button>
-          <div>
-            <Avatar name={name} title={name} />
-          </div>
+          <UserMenu userName={name} />
         </div>
       </div>
       <div className="main-container">
