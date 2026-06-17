@@ -6,6 +6,7 @@ class SelectedFilters(BaseModel):
     Topic: List[str]
     Sentiment: List[str]
     DateRange: List[str]
+    Recording: List[str] = Field(default_factory=lambda: ["all"])
 
 
 class ChartFilters(BaseModel):

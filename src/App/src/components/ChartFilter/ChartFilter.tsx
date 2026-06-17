@@ -27,6 +27,7 @@ import {
   EmojiMeh20Regular,
   EmojiMultiple20Regular,
   EmojiSad20Regular,
+  MicRegular,
 } from "@fluentui/react-icons";
 interface FilterComponentProps {
   applyFilters: (updatedFilters: SelectedFilters) => void;
@@ -56,6 +57,9 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
   );
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
     selectedFilters.Topic as string[]
+  );
+  const [selectedRecording, setSelectedRecording] = useState<string[]>(
+    (selectedFilters.Recording as string[]) || ["all"]
   );
 
   // Sync chips → local state: when a chip is removed/cleared from the
@@ -116,12 +120,17 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
     setIsCsatMenuOpen(false);
   };
 
+  const handleRecordingSelection = (key: string) => {
+    setSelectedRecording([key]);
+  };
+
   const handleApplyFilters = () => {
     const startDate = selectedDateRange || [""];
     const updatedFilters: SelectedFilters = {};
     updatedFilters.Topic = selectedTopics;
     updatedFilters.Sentiment = selectedCsat;
     updatedFilters.DateRange = startDate;
+    updatedFilters.Recording = selectedRecording;
     applyFilters(updatedFilters);
     dispatch(setSelectedDashboardFilters(updatedFilters));
 
@@ -144,6 +153,7 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
     setSelectedDateRange(defaultSelectedFilters.DateRange as string[]);
     setSelectedCsat(defaultSelectedFilters.Sentiment); // Assuming "all" is the key for the "all" sentiment
     setSelectedTopics(defaultSelectedFilters.Topic as []);
+    setSelectedRecording(defaultSelectedFilters.Recording as string[]);
     // Clear all chips so the SelectionPillBar stays in sync
     dispatch(clearChips());
   };
@@ -332,6 +342,34 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
           onClick={() => setIsTopicsMenuOpen(!isTopicsMenuOpen)}
           disabled={fetchingCharts}
           menuProps={topicMenuProps}
+        />
+        <VerticalDivider />
+        <DefaultButton
+          onRenderIcon={() => <MicRegular />}
+          text={
+            selectedRecording?.[0] === "all"
+              ? "Recording"
+              : selectedRecording?.[0] || "Recording"
+          }
+          menuProps={{
+            items: (filtersMeta?.Recording || [
+              { key: "all", displayValue: "all" },
+              { key: "With Recording", displayValue: "With Recording" },
+              { key: "Without Recording", displayValue: "Without Recording" },
+            ]).map((option) => ({
+              key: String(option.key),
+              text: option.displayValue === "all" ? "All" : option.displayValue,
+              canCheck: true,
+              checked: option.key === selectedRecording?.[0],
+              onClick: () => handleRecordingSelection(String(option.key)),
+            })),
+            directionalHint: DirectionalHint.topLeftEdge,
+            calloutProps: {
+              directionalHintFixed: true,
+              styles: { calloutMain: { maxHeight: 300, overflowY: "auto" } },
+            },
+          }}
+          disabled={fetchingCharts}
         />
         <VerticalDivider />
         <DefaultButton

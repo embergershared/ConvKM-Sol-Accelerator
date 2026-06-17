@@ -303,7 +303,8 @@ def create_tables():
         topic varchar(255),
         key_phrases nvarchar(max),
         complaint varchar(255),
-        mined_topic varchar(255)
+        mined_topic varchar(255),
+        has_audio BIT DEFAULT 0
     );""")
     cursor.execute('DROP TABLE IF EXISTS processed_data_key_phrases')
     cursor.execute("""CREATE TABLE processed_data_key_phrases (

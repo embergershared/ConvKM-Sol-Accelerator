@@ -50,6 +50,7 @@ export type CallListItem = {
   topic: string;
   complaint: string | null;
   summary_excerpt: string;     // first 80 chars of summary
+  has_audio: boolean;          // true if a WAV recording exists for this call
 };
 
 export type CallDetail = {
@@ -65,4 +66,5 @@ export type CallDetail = {
   summary: string;
   transcript_raw: string;      // raw processed_data.Content blob
   audio_url?: string;          // SAS URL for call recording playback (if available)
+  has_audio: boolean;          // true if a WAV recording exists for this call
 };

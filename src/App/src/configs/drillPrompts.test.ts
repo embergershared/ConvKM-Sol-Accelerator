@@ -117,6 +117,7 @@ describe("buildPromptForStack", () => {
       summary: "Customer complained about a billing charge.",
       transcript_raw:
         "Hi, this is Alex. I think I was double-charged. Hello Alex, let me check that.",
+      has_audio: false,
     };
     const out = buildPromptForStack(stack, callDetail);
     expect(out).toContain("abc-123");
@@ -161,6 +162,7 @@ describe("buildPromptForStack", () => {
       key_phrases: [],
       summary: "s",
       transcript_raw: "Hello. I lost my phone.",
+      has_audio: false,
     });
     expect(out).toContain("Hello. I lost my phone.");
     expect(out).toContain("abc-1");

@@ -300,6 +300,60 @@ def generate_sql_insert_script(df, table_name, columns, sql_file_name):
     return record_count
 
 
+def generate_sql_merge_script(df, table_name, columns, sql_file_name):
+    """
+    Generates and executes a SQL MERGE script for upsert behavior.
+    New records are inserted; existing records get has_audio updated if the new record has audio.
+    """
+    if df.empty:
+        print(f"No data to merge into {table_name}.")
+        return 0
+
+    sql_output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'index_scripts', 'sql_files'))
+    os.makedirs(sql_output_dir, exist_ok=True)
+    output_file_path = os.path.join(sql_output_dir, sql_file_name)
+
+    non_key_columns = [c for c in columns if c != 'ConversationId']
+    sql_commands = []
+
+    for _, row in df.iterrows():
+        values = {}
+        for col in columns:
+            value = row[col] if col in row.index else None
+            if pd.isna(value) or value is None:
+                values[col] = 'NULL'
+            elif isinstance(value, str):
+                values[col] = f"'{value.replace(chr(39), chr(39)+chr(39))}'"
+            elif isinstance(value, bool):
+                values[col] = "1" if value else "0"
+            else:
+                values[col] = str(value)
+
+        merge_sql = f"""MERGE [{table_name}] AS target
+USING (SELECT {values['ConversationId']} AS ConversationId) AS source
+ON target.ConversationId = source.ConversationId
+WHEN MATCHED AND {values.get('has_audio', '0')} = 1 THEN
+    UPDATE SET has_audio = 1
+WHEN NOT MATCHED THEN
+    INSERT ([{'], ['.join(columns)}])
+    VALUES ({', '.join(values[c] for c in columns)});
+"""
+        sql_commands.append(merge_sql)
+
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(sql_commands))
+
+    with open(output_file_path, 'r', encoding='utf-8') as f:
+        sql_script = f.read()
+        for stmt in sql_script.split(';\n'):
+            stmt = stmt.strip()
+            if stmt:
+                cursor.execute(stmt + ';')
+    conn.commit()
+
+    return len(df)
+
+
 def clean_spaces_with_regex(text):
     cleaned_text = re.sub(r'\s+', ' ', text)
     cleaned_text = re.sub(r'\.{2,}', '.', cleaned_text)
@@ -362,8 +416,12 @@ def create_tables():
                 topic varchar(255),
                 key_phrases nvarchar(max),
                 complaint varchar(255),
-                mined_topic varchar(255)
+                mined_topic varchar(255),
+                has_audio BIT DEFAULT 0
             );""")
+        # Add has_audio column if table exists but column doesn't (migration for existing tables)
+        cursor.execute("""IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('processed_data') AND name = 'has_audio')
+            ALTER TABLE processed_data ADD has_audio BIT DEFAULT 0;""")
         cursor.execute("""IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'processed_data_key_phrases')
             CREATE TABLE processed_data_key_phrases (
                 ConversationId varchar(255),
@@ -385,7 +443,8 @@ def create_tables():
             topic varchar(255),
             key_phrases nvarchar(max),
             complaint varchar(255),
-            mined_topic varchar(255)
+            mined_topic varchar(255),
+            has_audio BIT DEFAULT 0
         );""")
         cursor.execute('DROP TABLE IF EXISTS processed_data_key_phrases')
         cursor.execute("""CREATE TABLE processed_data_key_phrases (
@@ -468,7 +527,8 @@ async def process_files():
                     'sentiment': sentiment,
                     'topic': topic,
                     'key_phrases': key_phrases,
-                    'complaint': complaint
+                    'complaint': complaint,
+                    'has_audio': 0
                 })
 
                 docs.extend(await prepare_search_doc(content, conversation_id, path.name, embeddings_client))
@@ -540,7 +600,8 @@ async def process_files():
                     'sentiment': sentiment,
                     'topic': topic,
                     'key_phrases': key_phrases,
-                    'complaint': complaint
+                    'complaint': complaint,
+                    'has_audio': 1
                 })
 
                 document_id = conversation_id
@@ -561,8 +622,14 @@ async def process_files():
     # Batch insert all processed records using optimized SQL script
     if processed_records:
         df_processed = pd.DataFrame(processed_records)
-        columns = ['ConversationId', 'EndTime', 'StartTime', 'Content', 'summary', 'satisfied', 'sentiment', 'topic', 'key_phrases', 'complaint']
-        generate_sql_insert_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
+        columns = ['ConversationId', 'EndTime', 'StartTime', 'Content', 'summary', 'satisfied', 'sentiment', 'topic', 'key_phrases', 'complaint', 'has_audio']
+        if APPEND_MODE:
+            # In append mode, use MERGE to handle conflicts:
+            # - New records are inserted
+            # - Existing records get has_audio updated to 1 if the new record has audio
+            generate_sql_merge_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
+        else:
+            generate_sql_insert_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
 
     return conversationIds
 
