@@ -317,6 +317,33 @@ export async function getIsChartDisplayDefault(): Promise<{
   }
 }
 
+export async function getIsChatDisplayDefault(): Promise<{
+  isChatDisplayDefault: boolean;
+}> {
+  try {
+    const response = await httpClient.get("/api/display-chat-default");
+    if (!response.ok) {
+      return { isChatDisplayDefault: true };
+    }
+
+    const responseData = await parseResponseJson<{
+      isChatDisplayDefault?: string | boolean;
+    }>(response);
+    const rawValue = responseData?.isChatDisplayDefault;
+
+    return {
+      isChatDisplayDefault:
+        typeof rawValue === "string"
+          ? rawValue.toLowerCase() === "true"
+          : Boolean(rawValue),
+    };
+  } catch {
+    return {
+      isChatDisplayDefault: true,
+    };
+  }
+}
+
 export async function callConversationApi(
   options: ConversationRequest,
   abortSignal: AbortSignal

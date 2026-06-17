@@ -11,7 +11,7 @@ import {
 import { SparkleRegular } from "@fluentui/react-icons";
 import "./App.css";
 import { ChatHistoryPanel } from "./components/ChatHistoryPanel/ChatHistoryPanel";
-import { getUserInfo } from "./api/api";
+import { getUserInfo, getIsChatDisplayDefault } from "./api/api";
 import { useAppDispatch, useAppSelector } from "./state/hooks";
 import {
   fetchLayoutConfig,
@@ -119,6 +119,18 @@ const Dashboard: React.FC = () => {
     };
 
     void hydrateUser();
+  }, []);
+
+  useEffect(() => {
+    const hydrateChatDefault = async () => {
+      const { isChatDisplayDefault } = await getIsChatDisplayDefault();
+      setPanelShowStates((prev) => ({
+        ...prev,
+        [panels.CHAT]: isChatDisplayDefault,
+      }));
+    };
+
+    void hydrateChatDefault();
   }, []);
 
   const updateLayoutWidths = useCallback(

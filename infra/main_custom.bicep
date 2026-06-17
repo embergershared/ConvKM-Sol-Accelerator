@@ -1362,6 +1362,7 @@ module webSiteBackend 'modules/web-sites.bicep' = {
           AZURE_AI_SEARCH_CONNECTION_NAME: aiSearchName
           USE_AI_PROJECT_CLIENT: 'True'
           DISPLAY_CHART_DEFAULT: 'False'
+          DISPLAY_CHAT_BY_DEFAULT: 'True'
           APPLICATIONINSIGHTS_CONNECTION_STRING: enableMonitoring ? applicationInsights!.outputs.connectionString : ''
           DUMMY_TEST: 'True'
           SOLUTION_NAME: solutionSuffix
@@ -1545,6 +1546,9 @@ output USE_CHAT_HISTORY_ENABLED string = 'True'
 
 @description('Contains default chart display setting.')
 output DISPLAY_CHART_DEFAULT string = 'False'
+
+@description('Contains default chat display setting.')
+output DISPLAY_CHAT_BY_DEFAULT string = 'True'
 
 @description('Contains Azure AI Agent endpoint URL.')
 output AZURE_AI_AGENT_ENDPOINT string = !empty(existingProjEndpoint) ? existingProjEndpoint : aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
