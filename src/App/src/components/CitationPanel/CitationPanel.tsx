@@ -15,13 +15,15 @@ import "./CitationPanel.css";
  */
 function extractConversationId(title?: string): string | null {
   if (!title) return null;
-  // Strip a trailing _NN chunk suffix (one or more digits) to get the UUID.
-  const cleaned = title.replace(/_\d+$/, "");
-  // Basic UUID-like check (8-4-4-4-12 hex).
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleaned)) {
-    return cleaned;
-  }
-  return null;
+  // Try to find a UUID (8-4-4-4-12 hex) anywhere in the title.
+  // Handles formats like:
+  //   "2dce8842-a065-44eb-bd8a-2bfa87efd931_01"  (chunk suffix)
+  //   "convo_2dce8842-a065-44eb-bd8a-2bfa87efd931_2024-12-04 18_00_00.wav" (WAV filename)
+  //   "2dce8842-a065-44eb-bd8a-2bfa87efd931" (bare UUID)
+  const match = title.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+  return match ? match[0] : null;
 }
 
 interface Props {
