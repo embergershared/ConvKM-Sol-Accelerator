@@ -20,7 +20,7 @@ import "./Chat.css";
 import { getIsChartDisplayDefault } from "../../api/api";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import { fetchModelStatusOnce, fetchModels, pollModelStatus, selectModel } from "../../state/slices/appSlice";
-import { setUserMessage } from "../../state/slices/chatSlice";
+import { setUserMessage, setGeneratingResponse } from "../../state/slices/chatSlice";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useChatApi } from "../../hooks/useChatApi";
 import { subscribeAskAI } from "../../utils/chatBridge";
@@ -162,7 +162,15 @@ const Chat: React.FC<ChatProps> = ({
     return subscribeAskAI(({ prompt }) => {
       if (!prompt || !prompt.trim()) return;
       dispatch(setUserMessage(prompt));
-      void sendMessage(prompt);
+      // Ensure no stale generating state blocks the send
+      dispatch(setGeneratingResponse(false));
+      // Defer sendMessage to let React process the startNewConversation
+      // dispatch and the abort-on-conversation-change effect settle.
+      // Without this, sendMessage may see stale generatingResponse=true
+      // and silently bail out, leaving the prompt in the textarea unsent.
+      setTimeout(() => {
+        void sendMessage(prompt);
+      }, 100);
     });
   }, [dispatch, sendMessage]);
 
