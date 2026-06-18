@@ -12,7 +12,7 @@ import {
   DrawerFooter,
   Tag,
 } from "@fluentui/react-components";
-import { ArrowLeftRegular, DismissRegular, SparkleRegular } from "@fluentui/react-icons";
+import { ArrowLeftRegular, DismissRegular, LinkRegular, SparkleRegular } from "@fluentui/react-icons";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import {
   closeDrill,
@@ -123,6 +123,13 @@ const DrillDrawer: React.FC<{ onRequestShowChat?: () => void }> = ({
   // Resizable width — drag the handle on the left edge. Persisted to
   // localStorage so the user's preference survives sessions.
   const [width, setWidth] = useState<number>(() => loadStoredWidth());
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = useCallback(() => {
+    void navigator.clipboard.writeText(window.location.href);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }, []);
   const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(
     null
   );
@@ -253,6 +260,14 @@ const DrillDrawer: React.FC<{ onRequestShowChat?: () => void }> = ({
               >
                 Ask AI about this
               </Button>
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<LinkRegular />}
+                aria-label="Copy link to this view"
+                title={linkCopied ? "Copied!" : "Copy link to this view"}
+                onClick={handleCopyLink}
+              />
               <Button
                 appearance="subtle"
                 icon={<ArrowLeftRegular />}

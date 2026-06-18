@@ -196,6 +196,32 @@ const Chat: React.FC<ChatProps> = ({
     questionInputRef.current?.focus();
   }, [startNewChat]);
 
+  const handlePaste = useCallback(async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText) return;
+
+      const textarea = questionInputRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart ?? userMessage.length;
+        const end = textarea.selectionEnd ?? userMessage.length;
+        const newValue =
+          userMessage.slice(0, start) + clipboardText + userMessage.slice(end);
+        dispatch(setUserMessage(newValue));
+        // Restore cursor position after the inserted text
+        requestAnimationFrame(() => {
+          const newCursorPos = start + clipboardText.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+          textarea.focus();
+        });
+      } else {
+        dispatch(setUserMessage(userMessage + clipboardText));
+      }
+    } catch {
+      // Clipboard read failed (permission denied or not available)
+    }
+  }, [dispatch, userMessage]);
+
   return (
     <div className="chat-container">
       {modelChangePending && (
@@ -323,6 +349,15 @@ const Chat: React.FC<ChatProps> = ({
             rows={2}
             style={{ resize: "none" }}
             appearance="outline"
+          />
+          <DefaultButton
+            iconProps={{ iconName: "ClipboardList" }}
+            role="button"
+            onClick={() => void handlePaste()}
+            disabled={isInputDisabled}
+            className="paste-btn"
+            aria-disabled={isInputDisabled}
+            title="Paste from clipboard"
           />
           <DefaultButton
             iconProps={{ iconName: "Send" }}

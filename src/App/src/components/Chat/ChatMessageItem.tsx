@@ -1,7 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import supersub from "remark-supersub";
+import { Button } from "@fluentui/react-components";
+import { Copy16Regular, Checkmark16Regular } from "@fluentui/react-icons";
 import { type ChatMessage } from "../../types/AppTypes";
 import ChatChart from "../ChatChart/ChatChart";
 import Citations from "../Citations/Citations";
@@ -21,6 +23,16 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
   totalMessages,
   generatingResponse,
 }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    if (typeof message.content === "string") {
+      void navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, [message.content]);
+
   const isLastAssistantMessage =
     message.role === "assistant" && index === totalMessages - 1;
 
@@ -43,6 +55,15 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
     return (
       <div className="user-message">
         <span>{message.content}</span>
+        <Button
+          className="copy-msg-btn"
+          appearance="transparent"
+          size="small"
+          icon={copied ? <Checkmark16Regular /> : <Copy16Regular />}
+          onClick={handleCopy}
+          title={copied ? "Copied!" : "Copy message"}
+          aria-label={copied ? "Copied to clipboard" : "Copy message to clipboard"}
+        />
       </div>
     );
   }

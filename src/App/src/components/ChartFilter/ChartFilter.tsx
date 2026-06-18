@@ -150,12 +150,15 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
   };
 
   const handleResetFilters = () => {
-    setSelectedDateRange(defaultSelectedFilters.DateRange as string[]);
-    setSelectedCsat(defaultSelectedFilters.Sentiment); // Assuming "all" is the key for the "all" sentiment
-    setSelectedTopics(defaultSelectedFilters.Topic as []);
-    setSelectedRecording(defaultSelectedFilters.Recording as string[]);
-    // Clear all chips so the SelectionPillBar stays in sync
+    const resetFilters = { ...defaultSelectedFilters };
+    setSelectedDateRange(resetFilters.DateRange as string[]);
+    setSelectedCsat(resetFilters.Sentiment);
+    setSelectedTopics(resetFilters.Topic as []);
+    setSelectedRecording(resetFilters.Recording as string[]);
     dispatch(clearChips());
+    // Apply immediately so the dashboard refreshes in one click
+    applyFilters(resetFilters);
+    dispatch(setSelectedDashboardFilters(resetFilters));
   };
   const getDisplayValue = (
     filterList: { key: string; displayValue: string }[],

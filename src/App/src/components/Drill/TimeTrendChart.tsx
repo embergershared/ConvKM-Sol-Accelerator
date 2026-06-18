@@ -83,6 +83,9 @@ const TimeTrendChart: React.FC = () => {
     svg.selectAll("*").remove();
     // Reuse the singleton tooltip pattern from HorizontalBarChart.tsx — one
     // tooltip per page, removed on re-render to avoid stale handlers.
+    // Append inside the SVG's parent (within the OverlayDrawer dialog) rather
+    // than <body> so the tooltip inherits the dialog's top-layer stacking
+    // context and remains visible above the drawer backdrop.
     d3.selectAll("#drill-tooltip-container").remove();
 
     if (!data.length) return;
@@ -154,13 +157,14 @@ const TimeTrendChart: React.FC = () => {
       .style("fill", "#107c10")
       .text("Avg sentiment (-1 to +1)");
 
-    // Shared tooltip container — appended to body so it can escape svg/drawer
-    // overflow clipping.
+    // Shared tooltip container — appended inside the SVG's parent so it
+    // inherits the OverlayDrawer's dialog top-layer stacking context.
+    // Using position:fixed so it is not clipped by overflow:auto ancestors.
     const tooltip = d3
-      .select("body")
+      .select(svgEl.parentNode as Element)
       .append("div")
       .attr("id", "drill-tooltip-container")
-      .style("position", "absolute")
+      .style("position", "fixed")
       .style("background", "#fff")
       .style("padding", "8px 10px")
       .style("border", "1px solid #ccc")
@@ -188,6 +192,40 @@ const TimeTrendChart: React.FC = () => {
         `Satisfied: <strong>${satisfied}</strong><br>` +
         `Avg handle time: <strong>${aht}</strong>`
       );
+    };
+
+    // Position tooltip near the cursor, flipping left/above when near edges.
+    // The OverlayDrawer may apply CSS transforms which shift the coordinate
+    // origin for position:fixed children. We compensate by subtracting the
+    // containing block's viewport offset.
+    const positionTooltip = (event: MouseEvent) => {
+      const ttNode = tooltip.node() as HTMLElement | null;
+      if (!ttNode) return;
+      const ttW = ttNode.offsetWidth || 160;
+      const ttH = ttNode.offsetHeight || 100;
+      const gap = 8;
+      const vw = window.innerWidth;
+
+      // Find the effective containing block for position:fixed
+      const cb = ttNode.offsetParent as HTMLElement | null;
+      const cbRect = cb ? cb.getBoundingClientRect() : { left: 0, top: 0 };
+
+      // Mouse position relative to the containing block
+      const mx = event.clientX - cbRect.left;
+      const my = event.clientY - cbRect.top;
+
+      // Horizontal: prefer right of cursor, flip left if it overflows
+      let left = mx + gap;
+      if (event.clientX + gap + ttW > vw - gap) {
+        left = mx - ttW - gap;
+      }
+      // Vertical: prefer above cursor, flip below if it overflows
+      let top = my - ttH - gap;
+      if (event.clientY - ttH - gap < gap) {
+        top = my + gap;
+      }
+
+      tooltip.style("left", `${left}px`).style("top", `${top}px`);
     };
 
     const onPickBucket = (d: TimeseriesPoint) => {
@@ -225,9 +263,7 @@ const TimeTrendChart: React.FC = () => {
         tooltip.style("display", "block").html(formatTooltip(d));
       })
       .on("mousemove", (event) => {
-        tooltip
-          .style("left", `${event.pageX + 12}px`)
-          .style("top", `${event.pageY - 12}px`);
+        positionTooltip(event);
       })
       .on("mouseout", () => {
         tooltip.style("display", "none");
@@ -269,9 +305,51 @@ const TimeTrendChart: React.FC = () => {
         tooltip.style("display", "block").html(formatTooltip(d));
       })
       .on("mousemove", (event) => {
-        tooltip
-          .style("left", `${event.pageX + 12}px`)
-          .style("top", `${event.pageY - 12}px`);
+        positionTooltip(event);
+      })
+      .on("mouseout", () => {
+        tooltip.style("display", "none");
+      });
+
+    // Invisible wider hit area along the sentiment line for easier hover.
+    g.append("path")
+      .datum(data)
+      .attr("fill", "none")
+      .attr("stroke", "transparent")
+      .attr("stroke-width", 12)
+      .attr("d", line)
+      .style("pointer-events", "stroke")
+      .on("mouseover", (event) => {
+        // Find the nearest data point based on mouse X position
+        const [mouseX] = d3.pointer(event, g.node());
+        let closest = data[0];
+        let minDist = Infinity;
+        for (const d of data) {
+          const dx = Math.abs(
+            (x(d.bucket_start) ?? 0) + x.bandwidth() / 2 - mouseX
+          );
+          if (dx < minDist) {
+            minDist = dx;
+            closest = d;
+          }
+        }
+        tooltip.style("display", "block").html(formatTooltip(closest));
+      })
+      .on("mousemove", (event) => {
+        const [mouseX] = d3.pointer(event, g.node());
+        let closest = data[0];
+        let minDist = Infinity;
+        for (const d of data) {
+          const dx = Math.abs(
+            (x(d.bucket_start) ?? 0) + x.bandwidth() / 2 - mouseX
+          );
+          if (dx < minDist) {
+            minDist = dx;
+            closest = d;
+          }
+        }
+        tooltip.html(formatTooltip(closest));
+        positionTooltip(event);
       })
       .on("mouseout", () => {
         tooltip.style("display", "none");
