@@ -12,7 +12,7 @@
 
 
 `Generate a lines chart of the count of conversations by sentiment per day for the last 7 days.`
-
+grok then gpt
 
 `What are top 3 challenges user reported.`
     # => This one gives some conversations transcripts links

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchChartData,
   fetchChartDataWithFilters,
@@ -11,6 +11,7 @@ import WordCloudChart from "../../chartComponents/WordCloudChart";
 import TopicTable from "../../chartComponents/TopicTable";
 import Card from "../../chartComponents/Card";
 import ChartFilter from "../ChartFilter/ChartFilter";
+import SelectionPillBar from "../ChartFilter/SelectionPillBar";
 
 import "./Chart.css";
 import {
@@ -20,12 +21,15 @@ import {
 } from "../../types/AppTypes";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import {
+  addChip,
+  flattenChipsToSelectedFilters,
   setChartsData,
   setFetchingCharts,
   setFetchingFilters,
   setFiltersMeta,
   setFiltersMetaFetched,
   setInitialChartsDataFetched,
+  type ChartFilterChip,
 } from "../../state/slices/dashboardSlice";
 import { openDrill } from "../../state/slices/drillSlice";
 import { trackDrillEvent } from "../../utils/drillTelemetry";
@@ -34,7 +38,8 @@ import {
   defaultSelectedFilters,
   getGridStyles,
 } from "../../configs/Utils";
-import { Subtitle2, Tag } from "@fluentui/react-components";
+import { Button, Subtitle2, Tag } from "@fluentui/react-components";
+import { OpenRegular } from "@fluentui/react-icons";
 import { Spinner, SpinnerSize } from "@fluentui/react";
 import { getSentimentColor } from "../../utils/chartUtils";
 
@@ -58,6 +63,13 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
     (state) => state.dashboards.initialChartsDataFetched
   );
   const configCharts = useAppSelector((state) => state.app.config.charts);
+
+  const chartFilterChips = useAppSelector(
+    (state) => state.dashboards.chartFilterChips
+  );
+  const dashboardSelectedFilters = useAppSelector(
+    (state) => state.dashboards.selectedFilters
+  );
 
   const [appliedFetch, setAppliedFetch] = useState<boolean>(false);
   const [widgetsGapInPercentage] = useState<number>(1);
@@ -204,6 +216,81 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
     [getChartData]
   );
 
+  // Stage C — cross-filter chips drive a re-fetch identical to the manual
+  // ChartFilter "Apply" button path. We merge chips into the existing global
+  // selectedFilters and dispatch through the same applyFilters callback so
+  // the backend payload shape stays unchanged. Stringify the chip array for
+  // useEffect's dep list to dodge identity-thrash on every render.
+  const chipsKey = useMemo(
+    () => JSON.stringify(chartFilterChips),
+    [chartFilterChips]
+  );
+  useEffect(() => {
+    if (!initialChartsDataFetched) return;
+    const merged = flattenChipsToSelectedFilters(
+      chartFilterChips,
+      dashboardSelectedFilters
+    );
+    void applyFilters(merged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chipsKey]);
+
+  // Apply a cross-filter chip from a chart click. Dimension is the BACKEND
+  // filter key ("Topic" | "Sentiment"); for "key_phrase" we don't have a
+  // backend filter so the donut/bar/table call this and the word cloud
+  // keeps its Stage B drill behavior. See Resolved decisions §4.
+  const onCrossFilter = useCallback(
+    (chip: ChartFilterChip, chartLabel: string) => {
+      dispatch(addChip(chip));
+      trackDrillEvent("CrossFilterApplied", {
+        dimension: chip.dimension,
+        value: chip.value,
+        source: chip.source,
+        chart: chartLabel,
+      });
+    },
+    [dispatch]
+  );
+
+  // Investigate button — opens the drill drawer scoped to the chart's
+  // highest-value mark. The frontend chart data is already sorted, so the
+  // first entry is the top item for bars / tables / words; for the donut
+  // we pick the slice with the largest value explicitly.
+  const onInvestigate = useCallback(
+    (chart: ChartConfigItem) => {
+      if (!chart.data || chart.data.length === 0) return;
+      let dimension: "topic" | "sentiment" | "key_phrase" = "topic";
+      let value = "";
+      if (chart.type === "donutchart") {
+        dimension = "sentiment";
+        const top = [...chart.data].sort(
+          (a, b) => (parseInt(b.value) || 0) - (parseInt(a.value) || 0)
+        )[0];
+        value = top?.name ?? "";
+      } else if (chart.type === "bar") {
+        dimension = "topic";
+        value = chart.data[0]?.name ?? "";
+      } else if (chart.type === "table") {
+        dimension = "topic";
+        value = (chart.data[0]?.name as string) ?? "";
+      } else if (chart.type === "wordcloud") {
+        dimension = "key_phrase";
+        const top = [...chart.data].sort(
+          (a, b) => (b.size ?? 0) - (a.size ?? 0)
+        )[0];
+        value = top?.text ?? "";
+      }
+      if (!value) return;
+      dispatch(openDrill({ selection: { dimension, value }, bucket: "week" }));
+      trackDrillEvent("InvestigateClicked", {
+        dimension,
+        value,
+        chart: chart.title,
+      });
+    },
+    [dispatch]
+  );
+
   const renderChart = (chart: ChartConfigItem, heightInPixels: number) => {
     const hasData = chart.data && chart.data.length > 0;
 
@@ -234,20 +321,12 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
               fallbackChartWidthInPixels
             }
             containerID={chart.domId}
-            onSliceClick={(label) => {
-              dispatch(
-                openDrill({
-                  selection: { dimension: "sentiment", value: label },
-                  bucket: "week",
-                })
-              );
-              trackDrillEvent("DrillOpened", {
-                dimension: "sentiment",
-                value: label,
-                level: "timeseries",
-                bucket: "week",
-              });
-            }}
+            onSliceClick={(label) =>
+              onCrossFilter(
+                { dimension: "Sentiment", value: label, source: "chart" },
+                chart.title
+              )
+            }
           />
         ) : (
           <div
@@ -269,20 +348,12 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
             }))}
             containerHeight={heightInPixels}
             containerID={chart.domId}
-            onBarClick={(category) => {
-              dispatch(
-                openDrill({
-                  selection: { dimension: "topic", value: category },
-                  bucket: "week",
-                })
-              );
-              trackDrillEvent("DrillOpened", {
-                dimension: "topic",
-                value: category,
-                level: "timeseries",
-                bucket: "week",
-              });
-            }}
+            onBarClick={(category) =>
+              onCrossFilter(
+                { dimension: "Topic", value: category, source: "chart" },
+                chart.title
+              )
+            }
           />
         ) : (
           <div
@@ -308,18 +379,10 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
             onRowClick={(row) => {
               const value = String(row["name"] ?? "");
               if (!value) return;
-              dispatch(
-                openDrill({
-                  selection: { dimension: "topic", value },
-                  bucket: "week",
-                })
+              onCrossFilter(
+                { dimension: "Topic", value, source: "chart" },
+                chart.title
               );
-              trackDrillEvent("DrillOpened", {
-                dimension: "topic",
-                value,
-                level: "timeseries",
-                bucket: "week",
-              });
             }}
           />
         ) : (
@@ -349,6 +412,10 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
             }
             containerHeight={heightInPixels}
             onWordClick={(text) => {
+              // Stage C special-case: key_phrase isn't a backend filter yet, so
+              // word-cloud plain click keeps Stage B drill behavior. Use the
+              // Investigate button on this tile for parity with the other
+              // charts. Documented in Resolved decisions §4.
               dispatch(
                 openDrill({
                   selection: { dimension: "key_phrase", value: text },
@@ -360,6 +427,7 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
                 value: text,
                 level: "timeseries",
                 bucket: "week",
+                source: "chart",
               });
             }}
           />
@@ -406,6 +474,7 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
             filter: `blur(${fetchingCharts && appliedFetch ? "1.5px" : "0px"})`,
           }}
         >
+          <SelectionPillBar />
           {Object.values(groupedByRows).map((chartsList, index) => {
             const gridStyles = getGridStyles(
               [...chartsList],
@@ -435,9 +504,27 @@ const Chart = ({ layoutWidthUpdated }: ChartProps) => {
                       id={chart.domId}
                       className={`chart-item ${chart.type}Container`}
                     >
-                      <Subtitle2 className="chart-title">
-                        {chart.title}
-                      </Subtitle2>
+                      <div className="chart-item-header">
+                        <Subtitle2 className="chart-title">
+                          {chart.title}
+                        </Subtitle2>
+                        {chart.type !== "card" && chart.data?.length > 0 && (
+                          <Button
+                            className="investigate-btn"
+                            size="small"
+                            appearance="subtle"
+                            icon={<OpenRegular />}
+                            aria-label={`Investigate ${chart.title}`}
+                            title="Open drill drawer for the top item"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onInvestigate(chart);
+                            }}
+                          >
+                            Investigate
+                          </Button>
+                        )}
+                      </div>
                       {renderChart(chart, heightInPixels)}
                     </div>
                   ))}

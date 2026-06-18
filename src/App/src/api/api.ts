@@ -136,6 +136,28 @@ export const fetchCallDetail = async (
   return response.json();
 };
 
+export type AudioAvailability = {
+  available: boolean;
+  url?: string;
+  filename?: string;
+};
+
+export const fetchAudioUrl = async (
+  conversationId: string
+): Promise<AudioAvailability> => {
+  try {
+    const response = await httpClient.get(
+      `/api/audio/${encodeURIComponent(conversationId)}`
+    );
+    if (!response.ok) {
+      return { available: false };
+    }
+    return response.json();
+  } catch {
+    return { available: false };
+  }
+};
+
 export type UserInfo = {
   access_token: string;
   expires_on: string;
@@ -291,6 +313,33 @@ export async function getIsChartDisplayDefault(): Promise<{
   } catch {
     return {
       isChartDisplayDefault: true,
+    };
+  }
+}
+
+export async function getIsChatDisplayDefault(): Promise<{
+  isChatDisplayDefault: boolean;
+}> {
+  try {
+    const response = await httpClient.get("/api/display-chat-default");
+    if (!response.ok) {
+      return { isChatDisplayDefault: true };
+    }
+
+    const responseData = await parseResponseJson<{
+      isChatDisplayDefault?: string | boolean;
+    }>(response);
+    const rawValue = responseData?.isChatDisplayDefault;
+
+    return {
+      isChatDisplayDefault:
+        typeof rawValue === "string"
+          ? rawValue.toLowerCase() === "true"
+          : Boolean(rawValue),
+    };
+  } catch {
+    return {
+      isChatDisplayDefault: true,
     };
   }
 }

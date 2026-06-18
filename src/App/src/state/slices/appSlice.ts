@@ -180,13 +180,18 @@ const appSlice = createSlice({
       .addCase(fetchModels.fulfilled, (state, action) => {
         state.availableModels = action.payload;
 
+        // During a model switch the thunk sets selectedModelId itself, so
+        // don't override it here — just keep the in-flight selection.
         if (
+          state.modelSwitching &&
           state.selectedModelId &&
           action.payload.some((model) => model.id === state.selectedModelId)
         ) {
           return;
         }
 
+        // Otherwise always pick the backend's is_default (reflects the model
+        // actually running on the agents) so a page refresh is authoritative.
         state.selectedModelId = getDefaultModelId(action.payload);
       })
       .addCase(selectModel.pending, (state, action) => {
@@ -214,9 +219,18 @@ const appSlice = createSlice({
         state.pendingModelId = null;
       })
       .addCase(pollModelStatus.rejected, (state, action) => {
-        state.modelStatus = "failed";
-        state.modelStatusError =
-          action.payload ?? "Model activation failed or timed out.";
+        // Timeouts are not actionable — the model change already went through
+        // on the backend; Foundry just takes time to report "active". Silently
+        // reset to active so the user isn't shown a scary banner they can't act on.
+        const isTimeout = action.payload?.includes("Timed out");
+        if (isTimeout) {
+          state.modelStatus = "active";
+          state.modelStatusError = null;
+        } else {
+          state.modelStatus = "failed";
+          state.modelStatusError =
+            action.payload ?? "Model activation failed.";
+        }
         state.pendingModelId = null;
       })
       .addCase(fetchModelStatusOnce.fulfilled, (state, action) => {

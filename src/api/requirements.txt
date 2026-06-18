@@ -19,6 +19,7 @@ azure-ai-agents==1.2.0b5
 agent-framework-core==1.0.0rc2
 agent-framework-azure-ai==1.0.0rc2
 azure-cosmos==4.15.0
+azure-storage-file-datalake==12.20.0
 
 # Additional utilities
 openai==2.32.0

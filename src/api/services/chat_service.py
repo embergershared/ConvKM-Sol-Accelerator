@@ -177,23 +177,59 @@ class ChatService:
                         citation_marker_map[marker] = citation_counter
                     return f"[{citation_marker_map[marker]}]"
 
-                logger.info("Starting agent.run stream for conversation %s, thread %s",
-                            conversation_id, thread_conversation_id)
-                async for chunk in agent.run(query, stream=True, conversation_id=thread_conversation_id):
-                    # Collect citations from Azure AI Search responses
-                    for content in getattr(chunk, "contents", []):
-                        annotations = getattr(content, "annotations", [])
-                        if annotations:
-                            citations.extend(annotations)
+                # Retry logic for transient errors (503, search connection, timeouts)
+                max_retries = 5
+                base_retry_delay = 2  # seconds
+                last_exception = None
 
-                    chunk_text = str(chunk.text) if chunk.text else ""
+                for attempt in range(max_retries):
+                    try:
+                        logger.info("Starting agent.run stream for conversation %s, thread %s (attempt %d/%d)",
+                                    conversation_id, thread_conversation_id, attempt + 1, max_retries)
+                        async for chunk in agent.run(query, stream=True, conversation_id=thread_conversation_id):
+                            # Collect citations from Azure AI Search responses
+                            for content in getattr(chunk, "contents", []):
+                                annotations = getattr(content, "annotations", [])
+                                if annotations:
+                                    citations.extend(annotations)
 
-                    # Replace complete citation markers like 【4:0†source】 or 【4:0 source】 with [1], [2], etc.
-                    chunk_text = re.sub(r'【\d+:\d+†?[^】]*】', replace_citation_marker, chunk_text)
+                            chunk_text = str(chunk.text) if chunk.text else ""
 
-                    if chunk_text:
-                        complete_response += chunk_text
-                        yield ("assistant", chunk_text)
+                            # Replace complete citation markers like 【4:0†source】 or 【4:0 source】 with [1], [2], etc.
+                            chunk_text = re.sub(r'【\d+:\d+†?[^】]*】', replace_citation_marker, chunk_text)
+
+                            if chunk_text:
+                                complete_response += chunk_text
+                                yield ("assistant", chunk_text)
+                        # Stream completed successfully, break out of retry loop
+                        last_exception = None
+                        break
+                    except Exception as retry_ex:
+                        last_exception = retry_ex
+                        error_str = str(retry_ex).lower()
+                        is_transient = any(indicator in error_str for indicator in [
+                            "503", "service unavailable", "model could not be accessed",
+                            "502", "bad gateway", "504", "gateway timeout",
+                            "failed to fetch connection", "connection",
+                            "timeout", "temporarily unavailable"
+                        ])
+                        if is_transient and attempt < max_retries - 1 and not complete_response:
+                            # Exponential backoff with jitter: 2s, 4s, 8s, 16s
+                            wait_time = base_retry_delay * (2 ** attempt) + random.uniform(0, 1)
+                            logger.warning(
+                                "Transient error on attempt %d/%d for conversation %s, retrying in %.1fs: %s",
+                                attempt + 1, max_retries, conversation_id, wait_time, retry_ex
+                            )
+                            await asyncio.sleep(wait_time)
+                            # Reset state for retry
+                            citations = []
+                            citation_marker_map = {}
+                            citation_counter = 0
+                        else:
+                            raise
+
+                if last_exception is not None:
+                    raise last_exception
 
                 logger.info("Streaming complete for conversation %s: response_length=%d, citation_count=%d",
                             conversation_id, len(complete_response), len(citations))
@@ -244,17 +280,47 @@ class ChatService:
                     corrupt_key = f"{conversation_id}_corrupt_{random.randint(1000, 9999)}"
                     cache[corrupt_key] = thread_conversation_id
 
-                # Provide user-friendly error messages
+                # Classify errors and provide actionable user-facing messages
                 error_message = str(e).lower()
                 if "too many requests" in error_message or "429" in error_message:
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail="The service is currently experiencing high demand. Please try again in a few moments."
                     ) from e
+                elif "failed to fetch connection" in error_message or "search" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="The knowledge search service is temporarily unavailable. Please try again in a moment."
+                    ) from e
+                elif "503" in error_message or "service unavailable" in error_message or "model could not be accessed" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="The AI model is temporarily unavailable. This is usually resolved within a few seconds. Please try again shortly."
+                    ) from e
+                elif "502" in error_message or "bad gateway" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="A temporary connection issue occurred with the AI service. Please try again."
+                    ) from e
+                elif "504" in error_message or "gateway timeout" in error_message or "timeout" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                        detail="The request took too long to process. Please try a shorter or simpler question."
+                    ) from e
+                elif "401" in error_message or "unauthorized" in error_message or "authentication" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="A service authentication issue occurred. Please contact your administrator."
+                    ) from e
+                elif "content filter" in error_message or "content_filter" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Your message could not be processed due to content safety policies. Please rephrase your question."
+                    ) from e
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="An error occurred while processing the request."
+                        detail="An unexpected error occurred. Please try again. If the issue persists, try starting a new conversation."
                     ) from e
 
             finally:

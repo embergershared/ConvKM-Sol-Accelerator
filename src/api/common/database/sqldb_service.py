@@ -149,11 +149,17 @@ async def fetch_filters_data():
             select 'Satisfaction' as filter_name, satisfied as displayValue, satisfied as key1 from
             (SELECT distinct satisfied from processed_data) t
             union all
+            select 'Recording' as filter_name, recording_option as displayValue, recording_option as key1 from
+            (SELECT 'all' as recording_option
+            union all SELECT 'With Recording' as recording_option
+            union all SELECT 'Without Recording' as recording_option) t
+            union all
             select 'DateRange' as filter_name, date_range as displayValue, date_range as key1 from
             (SELECT 'Last 7 days' as date_range
             union all SELECT 'Last 14 days' as date_range
             union all SELECT 'Last 90 days' as date_range
             union all SELECT 'Year to Date' as date_range
+            union all SELECT 'All time' as date_range
             ) t'''
 
         cursor.execute(sql_stmt)
@@ -224,16 +230,34 @@ async def fetch_chart_data(chart_filters: ChartFilters = ''):
                                 where_clause += f"satisfied = '{satisfaction}'"
                         elif k == 'DateRange':
                             for date_range in v:
-                                if where_clause:
-                                    where_clause += " and "
-                                if date_range == 'Last 7 days':
+                                if date_range == 'All time':
+                                    pass  # no date filter
+                                elif date_range == 'Last 7 days':
+                                    if where_clause:
+                                        where_clause += " and "
                                     where_clause += "StartTime >= DATEADD(day, -7, GETDATE())"
                                 elif date_range == 'Last 14 days':
+                                    if where_clause:
+                                        where_clause += " and "
                                     where_clause += "StartTime >= DATEADD(day, -14, GETDATE())"
                                 elif date_range == 'Last 90 days':
+                                    if where_clause:
+                                        where_clause += " and "
                                     where_clause += "StartTime >= DATEADD(day, -90, GETDATE())"
                                 elif date_range == 'Year to Date':
+                                    if where_clause:
+                                        where_clause += " and "
                                     where_clause += "StartTime >= DATEADD(year, -1, GETDATE())"
+                        elif k == 'Recording':
+                            for recording in v:
+                                if recording == 'With Recording':
+                                    if where_clause:
+                                        where_clause += " and "
+                                    where_clause += "has_audio = 1"
+                                elif recording == 'Without Recording':
+                                    if where_clause:
+                                        where_clause += " and "
+                                    where_clause += "has_audio = 0"
         if where_clause:
             where_clause = f"where {where_clause} "
 
@@ -307,7 +331,16 @@ async def fetch_chart_data(chart_filters: ChartFilters = ''):
         else:
             result2 = []
 
-        where_clause = where_clause.replace('mined_topic', 'topic')
+        # For the key_phrases query, use a subquery to filter by has_audio via
+        # processed_data since that column doesn't exist on processed_data_key_phrases.
+        kp_where_clause = where_clause.replace('mined_topic', 'topic')
+        has_audio_filter = ""
+        if "has_audio = 1" in kp_where_clause:
+            has_audio_filter = "ConversationId IN (SELECT ConversationId FROM processed_data WHERE has_audio = 1)"
+            kp_where_clause = kp_where_clause.replace('has_audio = 1', has_audio_filter)
+        elif "has_audio = 0" in kp_where_clause:
+            has_audio_filter = "ConversationId IN (SELECT ConversationId FROM processed_data WHERE has_audio = 0)"
+            kp_where_clause = kp_where_clause.replace('has_audio = 0', has_audio_filter)
         sql_stmt = f'''select top 15 key_phrase as text,
             'KEY_PHRASES' as id, 'Key Phrases' as chart_name, 'wordcloud' as chart_type,
             call_frequency as size, lower(average_sentiment) as average_sentiment from
@@ -318,7 +351,7 @@ async def fetch_chart_data(chart_filters: ChartFilters = ''):
                 COUNT(*) AS call_frequency from
                 (
                     select key_phrase, sentiment from [dbo].[processed_data_key_phrases]
-                    {where_clause}
+                    {kp_where_clause}
                 ) t
                 GROUP BY key_phrase, sentiment
                 ORDER BY ROW_NUMBER() OVER (PARTITION BY key_phrase ORDER BY COUNT(*) DESC)
@@ -461,6 +494,14 @@ def _build_drill_filter_clauses(global_filters, table_alias: str = "pd"):
             clauses.append(
                 f"CAST({table_alias}.StartTime AS DATETIME) >= DATEFROMPARTS(YEAR(GETDATE()), 1, 1)"
             )
+
+    recordings = [r for r in (selected.get("Recording") or []) if r and r != "all"]
+    if recordings:
+        for recording in recordings:
+            if recording == "With Recording":
+                clauses.append(f"ISNULL({table_alias}.has_audio, 0) = 1")
+            elif recording == "Without Recording":
+                clauses.append(f"ISNULL({table_alias}.has_audio, 0) = 0")
 
     return clauses, params
 
@@ -620,7 +661,8 @@ async def fetch_drill_calls(
             pd.satisfied               AS satisfied,
             {topic_col}                AS topic,
             pd.complaint               AS complaint,
-            LEFT(ISNULL(pd.summary, ''), 80) AS summary_excerpt
+            LEFT(ISNULL(pd.summary, ''), 80) AS summary_excerpt,
+            ISNULL(pd.has_audio, 0)    AS has_audio
         FROM {base_from}
         WHERE {where}
         ORDER BY CAST(pd.StartTime AS DATETIME) DESC, pd.ConversationId DESC
@@ -669,7 +711,8 @@ async def fetch_call_detail(conversation_id: str) -> dict | None:
             pd.mined_topic             AS topic,
             pd.complaint               AS complaint,
             pd.summary                 AS summary,
-            pd.Content                 AS transcript_raw
+            pd.Content                 AS transcript_raw,
+            ISNULL(pd.has_audio, 0)    AS has_audio
         FROM [dbo].[processed_data] AS pd
         WHERE pd.ConversationId = ?
     """

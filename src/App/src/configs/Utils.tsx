@@ -17,10 +17,11 @@ export const defaultSelectedFilters = {
   Topic: [],
   Sentiment: ["all"],
   DateRange: ["Year to Date"],
+  Recording: ["all"],
 };
 
 export const widgetsContainerMaxHeight = 81; // in vh
-export const ACCEPT_FILTERS = ["Topic", "Sentiment", "DateRange"];
+export const ACCEPT_FILTERS = ["Topic", "Sentiment", "DateRange", "Recording"];
 export const getEqualWidgetsWidth = (
   noOfWidgets: number,
   gapInPercentage: number

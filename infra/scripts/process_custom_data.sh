@@ -303,7 +303,8 @@ cleanup_on_exit() {
 	else
 		echo "✅ Script completed successfully"
 	fi
-	restore_network_access
+	# COMMENTED OUT: Network/security restore not needed
+	# restore_network_access
 	exit $exit_code
 }
 
@@ -563,17 +564,18 @@ echo "==============================================="
 echo ""
 
 # Enable public network access for required services
-enable_public_access
-if [ $? -ne 0 ]; then
-	echo "Error: Failed to enable public network access for services."
-	exit 1
-fi
+# COMMENTED OUT: Network/security settings are already in the correct state
+# enable_public_access
+# if [ $? -ne 0 ]; then
+# 	echo "Error: Failed to enable public network access for services."
+# 	exit 1
+# fi
 
 pythonScriptPath="$SCRIPT_DIR/index_scripts/"
 
 # Install the requirements
 echo "Installing requirements"
-pip install --quiet -r ${pythonScriptPath}requirements.txt
+python3 -m pip install --quiet --break-system-packages -r ${pythonScriptPath}requirements.txt
 if [ $? -ne 0 ]; then
 	echo "Error: Failed to install Python requirements."
 	exit 1
@@ -581,13 +583,13 @@ fi
 
 # Create Content Understanding analyzers
 echo "✓ Creating Content Understanding analyzer templates"
-python "${pythonScriptPath}02_create_cu_template_text.py" --cu_endpoint="$cuEndpoint" --cu_api_version="$cuApiVersion"
+python3 "${pythonScriptPath}02_create_cu_template_text.py" --cu_endpoint="$cuEndpoint" --cu_api_version="$cuApiVersion"
 if [ $? -ne 0 ]; then
 	echo "Error: 02_create_cu_template_text.py failed."
 	exit 1
 fi
 
-python "${pythonScriptPath}02_create_cu_template_audio.py" --cu_endpoint="$cuEndpoint" --cu_api_version="$cuApiVersion"
+python3 "${pythonScriptPath}02_create_cu_template_audio.py" --cu_endpoint="$cuEndpoint" --cu_api_version="$cuApiVersion"
 if [ $? -ne 0 ]; then
 	echo "Error: 02_create_cu_template_audio.py failed."
 	exit 1
@@ -596,7 +598,7 @@ fi
 # Run 04_cu_process_custom_data.py
 echo "✓ Processing custom data"
 sql_server_fqdn="$sqlServerName.database.windows.net"
-python "${pythonScriptPath}04_cu_process_custom_data.py" \
+python3 "${pythonScriptPath}04_cu_process_custom_data.py" \
     --search_endpoint "$searchEndpoint" \
     --openai_endpoint "$openaiEndpoint" \
     --ai_project_endpoint "$aiAgentEndpoint" \

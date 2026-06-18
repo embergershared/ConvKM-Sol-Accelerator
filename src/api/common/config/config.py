@@ -40,6 +40,9 @@ class Config:
         self.solution_name = os.getenv("SOLUTION_NAME", "")
         self.azure_client_id = os.getenv("AZURE_CLIENT_ID", "")
 
+        # Storage account configuration
+        self.storage_account_name = os.getenv("STORAGE_ACCOUNT_NAME", "")
+
         # agent configuration
         self.orchestrator_agent_name = os.getenv("AGENT_NAME_CONVERSATION")
         self.title_agent_name = os.getenv("AGENT_NAME_TITLE")

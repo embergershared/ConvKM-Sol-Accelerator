@@ -66,6 +66,8 @@ parser.add_argument('--sql_database', required=True, help='Azure SQL Database na
 parser.add_argument('--cu_endpoint', required=True, help='Azure Content Understanding endpoint')
 parser.add_argument('--cu_api_version', required=True, help='Azure Content Understanding API version')
 parser.add_argument('--solution_name', required=True, help='Solution name for agent naming')
+parser.add_argument('--append', action='store_true', default=False,
+                    help='Append to existing data instead of wiping tables and search index')
 
 args = parser.parse_args()
 
@@ -81,6 +83,7 @@ SQL_DATABASE = args.sql_database
 CU_ENDPOINT = args.cu_endpoint
 CU_API_VERSION = args.cu_api_version
 SOLUTION_NAME = args.solution_name
+APPEND_MODE = args.append
 
 # Construct agent names from solution name (matching 01_create_agents.py pattern)
 TOPIC_MINING_AGENT_NAME = f"KM-TopicMiningAgent-{SOLUTION_NAME}"
@@ -95,19 +98,20 @@ AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
 
 # Azure DataLake setup
 account_url = f"https://{STORAGE_ACCOUNT_NAME}.dfs.core.windows.net"
-credential = AzureCliCredential(process_timeout=30)
+credential = AzureCliCredential(process_timeout=120)
 service_client = DataLakeServiceClient(account_url, credential=credential, api_version='2023-01-03')
 file_system_client = service_client.get_file_system_client(FILE_SYSTEM_CLIENT_NAME)
 paths = list(file_system_client.get_paths(path=DIRECTORY))
 
 # Azure Search setup
-search_credential = AzureCliCredential(process_timeout=30)
+search_credential = AzureCliCredential(process_timeout=120)
 search_client = SearchClient(SEARCH_ENDPOINT, INDEX_NAME, search_credential)
 index_client = SearchIndexClient(endpoint=SEARCH_ENDPOINT, credential=search_credential)
 
-# Delete the search index
+# Delete the search index (skip in append mode)
 search_index_client = SearchIndexClient(SEARCH_ENDPOINT, search_credential)
-search_index_client.delete_index(INDEX_NAME)
+if not APPEND_MODE:
+    search_index_client.delete_index(INDEX_NAME)
 
 
 # Create the search index
@@ -204,7 +208,7 @@ except Exception:  # Fall back to ODBC Driver 17
     cursor = conn.cursor()
 
 # Content Understanding client
-cu_credential = AzureCliCredential(process_timeout=30)
+cu_credential = AzureCliCredential(process_timeout=120)
 cu_token_provider = get_bearer_token_provider(cu_credential, "https://cognitiveservices.azure.com/.default")
 cu_client = AzureContentUnderstandingClient(
     endpoint=CU_ENDPOINT,
@@ -296,6 +300,60 @@ def generate_sql_insert_script(df, table_name, columns, sql_file_name):
     return record_count
 
 
+def generate_sql_merge_script(df, table_name, columns, sql_file_name):
+    """
+    Generates and executes a SQL MERGE script for upsert behavior.
+    New records are inserted; existing records get has_audio updated if the new record has audio.
+    """
+    if df.empty:
+        print(f"No data to merge into {table_name}.")
+        return 0
+
+    sql_output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'index_scripts', 'sql_files'))
+    os.makedirs(sql_output_dir, exist_ok=True)
+    output_file_path = os.path.join(sql_output_dir, sql_file_name)
+
+    non_key_columns = [c for c in columns if c != 'ConversationId']
+    sql_commands = []
+
+    for _, row in df.iterrows():
+        values = {}
+        for col in columns:
+            value = row[col] if col in row.index else None
+            if pd.isna(value) or value is None:
+                values[col] = 'NULL'
+            elif isinstance(value, str):
+                values[col] = f"'{value.replace(chr(39), chr(39)+chr(39))}'"
+            elif isinstance(value, bool):
+                values[col] = "1" if value else "0"
+            else:
+                values[col] = str(value)
+
+        merge_sql = f"""MERGE [{table_name}] AS target
+USING (SELECT {values['ConversationId']} AS ConversationId) AS source
+ON target.ConversationId = source.ConversationId
+WHEN MATCHED AND {values.get('has_audio', '0')} = 1 THEN
+    UPDATE SET has_audio = 1
+WHEN NOT MATCHED THEN
+    INSERT ([{'], ['.join(columns)}])
+    VALUES ({', '.join(values[c] for c in columns)});
+"""
+        sql_commands.append(merge_sql)
+
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(sql_commands))
+
+    with open(output_file_path, 'r', encoding='utf-8') as f:
+        sql_script = f.read()
+        for stmt in sql_script.split(';\n'):
+            stmt = stmt.strip()
+            if stmt:
+                cursor.execute(stmt + ';')
+    conn.commit()
+
+    return len(df)
+
+
 def clean_spaces_with_regex(text):
     cleaned_text = re.sub(r'\s+', ' ', text)
     cleaned_text = re.sub(r'\.{2,}', '.', cleaned_text)
@@ -344,28 +402,58 @@ async def prepare_search_doc(content, document_id, path_name, embeddings_client)
 
 # Database table creation
 def create_tables():
-    cursor.execute('DROP TABLE IF EXISTS processed_data')
-    cursor.execute("""CREATE TABLE processed_data (
-        ConversationId varchar(255) NOT NULL PRIMARY KEY,
-        EndTime varchar(255),
-        StartTime varchar(255),
-        Content varchar(max),
-        summary varchar(3000),
-        satisfied varchar(255),
-        sentiment varchar(255),
-        topic varchar(255),
-        key_phrases nvarchar(max),
-        complaint varchar(255),
-        mined_topic varchar(255)
-    );""")
-    cursor.execute('DROP TABLE IF EXISTS processed_data_key_phrases')
-    cursor.execute("""CREATE TABLE processed_data_key_phrases (
-        ConversationId varchar(255),
-        key_phrase varchar(500),
-        sentiment varchar(255),
-        topic varchar(255),
-        StartTime varchar(255)
-    );""")
+    if APPEND_MODE:
+        # In append mode, create tables only if they don't exist
+        cursor.execute("""IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'processed_data')
+            CREATE TABLE processed_data (
+                ConversationId varchar(255) NOT NULL PRIMARY KEY,
+                EndTime varchar(255),
+                StartTime varchar(255),
+                Content varchar(max),
+                summary varchar(3000),
+                satisfied varchar(255),
+                sentiment varchar(255),
+                topic varchar(255),
+                key_phrases nvarchar(max),
+                complaint varchar(255),
+                mined_topic varchar(255),
+                has_audio BIT DEFAULT 0
+            );""")
+        # Add has_audio column if table exists but column doesn't (migration for existing tables)
+        cursor.execute("""IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('processed_data') AND name = 'has_audio')
+            ALTER TABLE processed_data ADD has_audio BIT DEFAULT 0;""")
+        cursor.execute("""IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'processed_data_key_phrases')
+            CREATE TABLE processed_data_key_phrases (
+                ConversationId varchar(255),
+                key_phrase varchar(500),
+                sentiment varchar(255),
+                topic varchar(255),
+                StartTime varchar(255)
+            );""")
+    else:
+        cursor.execute('DROP TABLE IF EXISTS processed_data')
+        cursor.execute("""CREATE TABLE processed_data (
+            ConversationId varchar(255) NOT NULL PRIMARY KEY,
+            EndTime varchar(255),
+            StartTime varchar(255),
+            Content varchar(max),
+            summary varchar(3000),
+            satisfied varchar(255),
+            sentiment varchar(255),
+            topic varchar(255),
+            key_phrases nvarchar(max),
+            complaint varchar(255),
+            mined_topic varchar(255),
+            has_audio BIT DEFAULT 0
+        );""")
+        cursor.execute('DROP TABLE IF EXISTS processed_data_key_phrases')
+        cursor.execute("""CREATE TABLE processed_data_key_phrases (
+            ConversationId varchar(255),
+            key_phrase varchar(500),
+            sentiment varchar(255),
+            topic varchar(255),
+            StartTime varchar(255)
+        );""")
     conn.commit()
 
 
@@ -383,26 +471,28 @@ async def process_files():
 
     # Create embeddings client for entire processing session
     async with (
-        AsyncAzureCliCredential(process_timeout=30) as async_cred,
+        AsyncAzureCliCredential(process_timeout=120) as async_cred,
         AsyncAzureOpenAI(
             azure_endpoint=AZURE_OPENAI_ENDPOINT,
             api_version=AZURE_OPENAI_API_VERSION,
             azure_ad_token_provider=get_bearer_token_provider(
-                AzureCliCredential(process_timeout=30),
+                AzureCliCredential(process_timeout=120),
                 "https://cognitiveservices.azure.com/.default",
             ),
         ) as embeddings_client
     ):
         ANALYZER_ID = "ckm-json"
         # Process files and insert into DB and Search - transcripts
+        total_transcripts = len(paths)
         for path in paths:
             file_client = file_system_client.get_file_client(path.name)
             data_file = file_client.download_file()
             data = data_file.readall()
             try:
+                file_name = path.name.split('/')[-1].replace("%3A", "_")
+                print(f"  ⏳ [{counter + 1}/{total_transcripts}] Processing transcript: {file_name}", flush=True)
                 response = cu_client.begin_analyze(ANALYZER_ID, file_location="", file_data=data)
                 result = cu_client.poll_result(response)
-                file_name = path.name.split('/')[-1].replace("%3A", "_")
                 start_time = file_name.replace(".json", "")[-19:]
                 timestamp_format = "%Y-%m-%d %H_%M_%S"
                 start_timestamp = datetime.strptime(start_time, timestamp_format)
@@ -437,7 +527,8 @@ async def process_files():
                     'sentiment': sentiment,
                     'topic': topic,
                     'key_phrases': key_phrases,
-                    'complaint': complaint
+                    'complaint': complaint,
+                    'has_audio': 0
                 })
 
                 docs.extend(await prepare_search_doc(content, conversation_id, path.name, embeddings_client))
@@ -455,6 +546,8 @@ async def process_files():
         # Process files for audio data
         ANALYZER_ID = "ckm-audio"
         audio_paths = list(file_system_client.get_paths(path=AUDIO_DIRECTORY))
+        total_audio = len(audio_paths)
+        print(f"  Found {total_audio} audio files to process", flush=True)
         docs = []
         counter = 0
         # process and upload audio files to search index - audio data
@@ -463,11 +556,12 @@ async def process_files():
             data_file = file_client.download_file()
             data = data_file.readall()
             try:
+                file_name = path.name.split('/')[-1]
+                print(f"  ⏳ [{counter + 1}/{total_audio}] Transcribing audio: {file_name}", flush=True)
                 # Analyzer file
                 response = cu_client.begin_analyze(ANALYZER_ID, file_location="", file_data=data)
                 result = cu_client.poll_result(response)
 
-                file_name = path.name.split('/')[-1]
                 start_time = file_name.replace(".wav", "")[-19:]
 
                 timestamp_format = "%Y-%m-%d %H_%M_%S"
@@ -506,7 +600,8 @@ async def process_files():
                     'sentiment': sentiment,
                     'topic': topic,
                     'key_phrases': key_phrases,
-                    'complaint': complaint
+                    'complaint': complaint,
+                    'has_audio': 1
                 })
 
                 document_id = conversation_id
@@ -527,8 +622,14 @@ async def process_files():
     # Batch insert all processed records using optimized SQL script
     if processed_records:
         df_processed = pd.DataFrame(processed_records)
-        columns = ['ConversationId', 'EndTime', 'StartTime', 'Content', 'summary', 'satisfied', 'sentiment', 'topic', 'key_phrases', 'complaint']
-        generate_sql_insert_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
+        columns = ['ConversationId', 'EndTime', 'StartTime', 'Content', 'summary', 'satisfied', 'sentiment', 'topic', 'key_phrases', 'complaint', 'has_audio']
+        if APPEND_MODE:
+            # In append mode, use MERGE to handle conflicts:
+            # - New records are inserted
+            # - Existing records get has_audio updated to 1 if the new record has audio
+            generate_sql_merge_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
+        else:
+            generate_sql_insert_script(df_processed, 'processed_data', columns, 'custom_processed_data_batch_insert.sql')
 
     return conversationIds
 
@@ -579,7 +680,7 @@ If no topic is a perfect match, choose the closest one from the list ONLY
 async def create_agents():
     """Create topic mining and mapping agents asynchronously."""
     async with (
-        AsyncAzureCliCredential(process_timeout=30) as async_cred,
+        AsyncAzureCliCredential(process_timeout=120) as async_cred,
         AIProjectClient(endpoint=AI_PROJECT_ENDPOINT, credential=async_cred) as project_client,
     ):
         topic_mining_agent = await project_client.agents.create_version(
@@ -608,7 +709,7 @@ try:
     async def call_topic_mining_agent(topics_str1):
         """Use Topic Mining Agent with Agent Framework to analyze and categorize topics."""
         async with (
-            AsyncAzureCliCredential(process_timeout=30) as async_cred,
+            AsyncAzureCliCredential(process_timeout=120) as async_cred,
             AIProjectClient(endpoint=AI_PROJECT_ENDPOINT, credential=async_cred) as project_client,
         ):
             # Create provider for agent management
@@ -655,7 +756,7 @@ try:
         """Map all topics to categories using agent."""
         # Create credential, project client, provider, and agent once for reuse
         async with (
-            AsyncAzureCliCredential(process_timeout=30) as async_cred,
+            AsyncAzureCliCredential(process_timeout=120) as async_cred,
             AIProjectClient(endpoint=AI_PROJECT_ENDPOINT, credential=async_cred) as project_client,
         ):
             # Create provider for agent management
@@ -746,7 +847,7 @@ finally:
         async def delete_agents():
             """Delete topic mining and mapping agents asynchronously."""
             async with (
-                AsyncAzureCliCredential(process_timeout=30) as async_cred,
+                AsyncAzureCliCredential(process_timeout=120) as async_cred,
                 AIProjectClient(endpoint=AI_PROJECT_ENDPOINT, credential=async_cred) as project_client,
             ):
                 await project_client.agents.delete_version(topic_mining_agent.name, topic_mining_agent.version)

@@ -83,6 +83,18 @@ param gptModelVersion string = '2024-07-18'
 @description('Optional. Version of AI Agent API.')
 param azureAiAgentApiVersion string = '2025-05-01'
 
+@description('Optional. Name of the Conversation Agent in Foundry. Defaults to KM-ConversationAgent-{solutionName}.')
+param agentNameConversation string = ''
+
+@description('Optional. Name of the Title Agent in Foundry. Defaults to KM-TitleAgent-{solutionName}.')
+param agentNameTitle string = ''
+
+@description('Optional. Comma-separated list of model publishers allowed in the model selector dropdown. Defaults to OpenAI,Microsoft,xAI,DeepSeek,Meta.')
+param modelFilterAllowedPublishers string = 'OpenAI,Microsoft,xAI,DeepSeek,Meta'
+
+@description('Optional. Whether to filter out model deployments that do not advertise function-calling support. Defaults to true.')
+param modelFilterRequireFunctionCalling string = 'true'
+
 @description('Optional. Version of Content Understanding API.')
 param azureContentUnderstandingApiVersion string = '2024-12-01-preview'
 
@@ -130,6 +142,12 @@ param containerRegistryNameForAcrPull string = ''
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
+
+// Mandatory tags applied to every resource regardless of caller-supplied tags.
+var mandatoryTags = {
+  SecurityControl: 'Ignore'
+}
+var allTags = union(tags, mandatoryTags)
 
 @description('Optional. Enable private networking for applicable resources, aligned with the Well Architected Framework recommendations. Defaults to false.')
 param enablePrivateNetworking bool = false
@@ -227,7 +245,7 @@ resource resourceGroupTags 'Microsoft.Resources/tags@2025-04-01' = {
   properties: {
     tags: union(
       existingTags,
-      tags,
+      allTags,
       {
         TemplateName: 'KM-Generic'
         Type: enablePrivateNetworking ? 'WAF' : 'Non-WAF'
@@ -261,12 +279,12 @@ resource avmTelemetry 'Microsoft.Resources/deployments@2024-03-01' = if (enableT
 // ========== Log Analytics Workspace ========== //
 // WAF best practices for Log Analytics: https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-log-analytics
 // WAF PSRules for Log Analytics: https://azure.github.io/PSRule.Rules.Azure/en/rules/resource/#azure-monitor-logs
-var logAnalyticsWorkspaceResourceName = 'log-${solutionSuffix}'
+var logAnalyticsWorkspaceResourceName = 'law-${solutionSuffix}'
 module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.14.2' = if (enableMonitoring && !useExistingLogAnalytics) {
   name: take('avm.res.operational-insights.workspace.${logAnalyticsWorkspaceResourceName}', 64)
   params: {
     name: logAnalyticsWorkspaceResourceName
-    tags: tags
+    tags: allTags
     location: location
     enableTelemetry: enableTelemetry
     skuName: 'PerGB2018'
@@ -287,7 +305,7 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
     dataSources: enablePrivateNetworking
       ? [
           {
-            tags: tags
+            tags: allTags
             eventLogName: 'Application'
             eventTypes: [
               {
@@ -329,7 +347,7 @@ module applicationInsights 'br/public:avm/res/insights/component:0.7.1' = if (en
   name: take('avm.res.insights.component.${applicationInsightsResourceName}', 64)
   params: {
     name: applicationInsightsResourceName
-    tags: tags
+    tags: allTags
     location: location
     enableTelemetry: enableTelemetry
     retentionInDays: 365
@@ -349,7 +367,7 @@ module virtualNetwork 'modules/virtualNetwork.bicep' = if (enablePrivateNetworki
     name: 'vnet-${solutionSuffix}'
     addressPrefixes: ['10.0.0.0/20'] // 4096 addresses (enough for 8 /23 subnets or 16 /24)
     location: location
-    tags: tags
+    tags: allTags
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
     resourceSuffix: solutionSuffix
     enableTelemetry: enableTelemetry
@@ -376,7 +394,7 @@ module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (enablePr
         ]
       }
     ]
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
     publicIPAddressObject: {
       name: 'pip-${bastionHostName}'
@@ -394,7 +412,7 @@ module jumpboxVM 'br/public:avm/res/compute/virtual-machine:0.21.0' = if (enable
     location: location
     adminUsername: vmAdminUsername ?? 'JumpboxAdminUser'
     adminPassword: vmAdminPassword ?? 'JumpboxAdminP@ssw0rd1234!'
-    tags: tags
+    tags: allTags
     availabilityZone: -1
     imageReference: {
       publisher: 'microsoft-dsvm'
@@ -484,7 +502,7 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8.0' = [
     name: 'avm.res.network.private-dns-zone.${split(zone, '.')[1]}'
     params: {
       name: zone
-      tags: tags
+      tags: allTags
       enableTelemetry: enableTelemetry
       virtualNetworkLinks: [
         {
@@ -505,7 +523,7 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
   params: {
     name: userAssignedIdentityResourceName
     location: location
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
   }
 }
@@ -518,7 +536,7 @@ module backendUserAssignedIdentity 'br/public:avm/res/managed-identity/user-assi
   params: {
     name: backendUserAssignedIdentityResourceName
     location: location
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
   }
 }
@@ -591,7 +609,7 @@ module aiFoundryAiServices 'modules/ai-services.bicep' = if (aiFoundryAIservices
   params: {
     name: aiFoundryAiServicesResourceName
     location: aiServiceLocation
-    tags: tags
+    tags: allTags
     existingFoundryProjectResourceId: existingAiFoundryAiProjectResourceId
     projectName: !empty(existingAIProjectName) ? existingAIProjectName : aiFoundryAiServicesAiProjectResourceName
     projectDescription: 'AI Foundry Project'
@@ -670,7 +688,7 @@ module aiFoundryPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.8.
     name: 'pep-${aiFoundryAiServicesResourceName}'
     customNetworkInterfaceName: 'nic-${aiFoundryAiServicesResourceName}'
     location: location
-    tags: tags
+    tags: allTags
     privateLinkServiceConnections: [
       {
         name: 'pep-${aiFoundryAiServicesResourceName}-connection'
@@ -708,7 +726,7 @@ module cognitiveServicesCu 'br/public:avm/res/cognitive-services/account:0.14.1'
   params: {
     name: aiServicesNameCu
     location: contentUnderstandingLocation
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
     sku: 'S0'
@@ -743,7 +761,7 @@ module cognitiveServicesCuPrivateEndpoint 'br/public:avm/res/network/private-end
     name: 'pep-${aiFoundryAiServicesCUResourceName}'
     customNetworkInterfaceName: 'nic-${aiFoundryAiServicesCUResourceName}'
     location: location
-    tags: tags
+    tags: allTags
     privateLinkServiceConnections: [
       {
         name: 'pep-${aiFoundryAiServicesCUResourceName}-connection'
@@ -850,7 +868,7 @@ module searchServiceUpdate 'br/public:avm/res/search/search-service:0.12.0' = {
     sku: 'standard'
     semanticSearch: 'free'
     // Use the deployment tags provided to the template
-    tags: tags
+    tags: allTags
     publicNetworkAccess: 'Enabled' //enablePrivateNetworking ? 'Disabled' : 'Enabled'
     privateEndpoints: false //enablePrivateNetworking
     ? [
@@ -940,7 +958,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
     supportsHttpsTrafficOnly: true
     accessTier: 'Hot'
     enableTelemetry: enableTelemetry
-    tags: tags
+    tags: allTags
     enableHierarchicalNamespace: true
     roleAssignments: [
       {
@@ -956,6 +974,11 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
       {
         principalId: userAssignedIdentity.outputs.principalId
         roleDefinitionIdOrName: 'Storage File Data Privileged Contributor'
+        principalType: 'ServicePrincipal'
+      }
+      {
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionIdOrName: 'Storage Blob Delegator'
         principalType: 'ServicePrincipal'
       }
     ]
@@ -1024,7 +1047,17 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
         ]
       : []
     blobServices: {
-      corsRules: []
+      corsRules: [
+        {
+          allowedOrigins: [
+            'https://app-${solutionSuffix}.azurewebsites.net'
+          ]
+          allowedMethods: [ 'GET', 'HEAD', 'OPTIONS' ]
+          allowedHeaders: [ '*' ]
+          exposedHeaders: [ 'Content-Length', 'Content-Type' ]
+          maxAgeInSeconds: 3600
+        }
+      ]
       deleteRetentionPolicyEnabled: false
       changeFeedEnabled: false
       restorePolicyEnabled: false
@@ -1050,7 +1083,7 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.18.0' = {
     // Required parameters
     name: cosmosDbResourceName
     location: location
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
     sqlDatabases: [
       {
@@ -1190,7 +1223,7 @@ module sqlDBModule 'br/public:avm/res/sql/server:0.21.1' = {
           }
         ]
       : []
-    tags: tags
+    tags: allTags
   }
 }
 
@@ -1200,7 +1233,7 @@ module sqlDbPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.11.1' 
   params: {
     name: 'pep-sql-${solutionSuffix}'
     location: location
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
     subnetResourceId: virtualNetwork!.outputs.pepsSubnetResourceId
     customNetworkInterfaceName: 'nic-sql-${solutionSuffix}'
@@ -1231,7 +1264,7 @@ module webServerFarm 'br/public:avm/res/web/serverfarm:0.5.0' = {
   name: 'deploy_app_service_plan_serverfarm'
   params: {
     name: webServerFarmResourceName
-    tags: tags
+    tags: allTags
     enableTelemetry: enableTelemetry
     location: location
     reserved: true
@@ -1338,7 +1371,7 @@ module webSiteBackend 'modules/web-sites.bicep' = {
   dependsOn: useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull) ? [ backendAcrPullRole ] : []
   params: {
     name: backendWebSiteResourceName
-    tags: tags
+    tags: allTags
     location: location
     kind: 'app,linux,container'
     serverFarmResourceId: webServerFarm.?outputs.resourceId
@@ -1352,19 +1385,21 @@ module webSiteBackend 'modules/web-sites.bicep' = {
       linuxFxVersion: 'DOCKER|${backendContainerRegistryHostname}/${backendContainerImageName}:${backendContainerImageTag}'
       minTlsVersion: '1.2'
       // When pulling from a private ACR, App Service must be told to authenticate
-      // using its managed identity. The user-assigned identity below also needs the
-      // AcrPull role on the registry (granted by the acr-pull-role module when
-      // containerRegistryNameForAcrPull is set).
-      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull
-      acrUserManagedIdentityID: useManagedIdentityForAcrPull ? backendUserAssignedIdentity.outputs.clientId : null
+      // using its managed identity. When acrUserManagedIdentityID is omitted the
+      // system-assigned managed identity is used, which avoids policies that block
+      // user-assigned identities. The SAMI AcrPull role assignment is granted by
+      // the backendWebSiteSamiAcrPullRole module.
+      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull || !empty(containerRegistryNameForAcrPull)
     }
     configs: [
       {
         name: 'appsettings'
         properties: {
           REACT_APP_LAYOUT_CONFIG: reactAppLayoutConfig
-          AGENT_NAME_CONVERSATION: ''
-          AGENT_NAME_TITLE: ''
+          AGENT_NAME_CONVERSATION: !empty(agentNameConversation) ? agentNameConversation : 'KM-ConversationAgent-${solutionSuffix}'
+          AGENT_NAME_TITLE: !empty(agentNameTitle) ? agentNameTitle : 'KM-TitleAgent-${solutionSuffix}'
+          MODEL_FILTER_ALLOWED_PUBLISHERS: modelFilterAllowedPublishers
+          MODEL_FILTER_REQUIRE_FUNCTION_CALLING: modelFilterRequireFunctionCalling
           API_APP_NAME: 'api-${solutionSuffix}'
           AI_FOUNDRY_RESOURCE_ID: aiFoundryAiServices.outputs.resourceId
           AZURE_AI_AGENT_ENDPOINT: !empty(existingProjEndpoint) ? existingProjEndpoint : aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
@@ -1380,14 +1415,16 @@ module webSiteBackend 'modules/web-sites.bicep' = {
           SQLDB_USER_MID: backendUserAssignedIdentity.outputs.clientId
           AZURE_AI_SEARCH_ENDPOINT: 'https://${aiSearchName}.search.windows.net'
           AZURE_AI_SEARCH_INDEX: 'call_transcripts_index'
-          AZURE_AI_SEARCH_CONNECTION_NAME: aiSearchName
+          AZURE_AI_SEARCH_CONNECTION_NAME: aiSearchConnectionName
           USE_AI_PROJECT_CLIENT: 'True'
           DISPLAY_CHART_DEFAULT: 'False'
+          DISPLAY_CHAT_BY_DEFAULT: 'True'
           APPLICATIONINSIGHTS_CONNECTION_STRING: enableMonitoring ? applicationInsights!.outputs.connectionString : ''
           DUMMY_TEST: 'True'
           SOLUTION_NAME: solutionSuffix
           APP_ENV: 'Prod'
           AZURE_CLIENT_ID: backendUserAssignedIdentity.outputs.clientId
+          STORAGE_ACCOUNT_NAME: storageAccount.outputs.name
           AZURE_BASIC_LOGGING_LEVEL: 'INFO'
           AZURE_PACKAGE_LOGGING_LEVEL: 'WARNING'
           AZURE_LOGGING_PACKAGES: ''
@@ -1429,7 +1466,7 @@ module webSiteFrontend 'modules/web-sites.bicep' = {
   dependsOn: useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull) ? [ frontendAcrPullRole ] : []
   params: {
     name: webSiteResourceName
-    tags: tags
+    tags: allTags
     location: location
     kind: 'app,linux,container'
     serverFarmResourceId: webServerFarm.outputs.resourceId
@@ -1443,8 +1480,7 @@ module webSiteFrontend 'modules/web-sites.bicep' = {
     siteConfig: {
       linuxFxVersion: 'DOCKER|${frontendContainerRegistryHostname}/${frontendContainerImageName}:${frontendContainerImageTag}'
       minTlsVersion: '1.2'
-      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull
-      acrUserManagedIdentityID: useManagedIdentityForAcrPull ? userAssignedIdentity!.outputs.clientId : null
+      acrUseManagedIdentityCreds: useManagedIdentityForAcrPull || !empty(containerRegistryNameForAcrPull)
     }
     configs: [
       {
@@ -1499,6 +1535,7 @@ var roleId_SearchIndexDataReader                = '1407120a-92aa-4202-b7e9-c0e19
 var roleId_StorageBlobDataContributor           = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var roleId_StorageAccountContributor            = '17d1049b-9a84-46fb-8f53-869881c3d3ab'
 var roleId_StorageFileDataPrivilegedContributor = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+var roleId_StorageBlobDelegator                 = 'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
 // Cosmos DB Built-in Data Contributor (data plane). Has the same
 // dataActions as the custom 'Cosmos DB SQL Data Contributor' role
 // defined on the cosmos account above. Using the built-in avoids the
@@ -1562,7 +1599,7 @@ module backendWebSiteSamiOnExistingAiFoundry 'modules/role-assignment.bicep' = [
   }
 ]
 
-module backendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+module backendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (!empty(containerRegistryNameForAcrPull)) {
   name: take('module.acr-pull.sami.backend.${containerRegistryNameForAcrPull}', 64)
   params: {
     acrName: containerRegistryNameForAcrPull
@@ -1606,6 +1643,7 @@ module frontendWebSiteSamiMirror 'modules/web-site-sami-rbac-mirror.bicep' = {
       roleId_StorageBlobDataContributor
       roleId_StorageAccountContributor
       roleId_StorageFileDataPrivilegedContributor
+      roleId_StorageBlobDelegator
     ]
   }
   dependsOn: [
@@ -1630,7 +1668,7 @@ module frontendWebSiteSamiOnExistingAiFoundry 'modules/role-assignment.bicep' = 
   }
 ]
 
-module frontendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (useManagedIdentityForAcrPull && !empty(containerRegistryNameForAcrPull)) {
+module frontendWebSiteSamiAcrPullRole 'modules/acr-pull-role.bicep' = if (!empty(containerRegistryNameForAcrPull)) {
   name: take('module.acr-pull.sami.frontend.${containerRegistryNameForAcrPull}', 64)
   params: {
     acrName: containerRegistryNameForAcrPull
@@ -1742,6 +1780,9 @@ output USE_CHAT_HISTORY_ENABLED string = 'True'
 @description('Contains default chart display setting.')
 output DISPLAY_CHART_DEFAULT string = 'False'
 
+@description('Contains default chat display setting.')
+output DISPLAY_CHAT_BY_DEFAULT string = 'True'
+
 @description('Contains Azure AI Agent endpoint URL.')
 output AZURE_AI_AGENT_ENDPOINT string = !empty(existingProjEndpoint) ? existingProjEndpoint : aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint
 
@@ -1782,10 +1823,10 @@ output AZURE_OPENAI_CU_ENDPOINT string = cognitiveServicesCu.outputs.endpoint
 output API_APP_NAME string = 'api-${solutionSuffix}'
 
 @description('Contains Conversation Agent name.')
-output AGENT_NAME_CONVERSATION string = ''
+output AGENT_NAME_CONVERSATION string = !empty(agentNameConversation) ? agentNameConversation : 'KM-ConversationAgent-${solutionSuffix}'
 
 @description('Contains Title Agent name.')
-output AGENT_NAME_TITLE string = ''
+output AGENT_NAME_TITLE string = !empty(agentNameTitle) ? agentNameTitle : 'KM-TitleAgent-${solutionSuffix}'
 
 @description('Industry Use Case.')
 output USE_CASE string = usecase

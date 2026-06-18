@@ -289,6 +289,14 @@ async def get_chart_config():
     return JSONResponse(content={"error": "DISPLAY_CHART_DEFAULT flag not found in environment variables"}, status_code=400)
 
 
+@router.get("/display-chat-default")
+async def get_chat_display_default():
+    logger.info("GET /display-chat-default called")
+    chat_config = os.getenv("DISPLAY_CHAT_BY_DEFAULT", "True")
+    track_event_if_configured("ChatDisplayDefaultFetched", {"value": chat_config})
+    return JSONResponse(content={"isChatDisplayDefault": chat_config})
+
+
 @router.post("/fetch-azure-search-content")
 async def fetch_azure_search_content_endpoint(request: Request):
     """

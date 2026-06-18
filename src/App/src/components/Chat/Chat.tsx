@@ -20,9 +20,10 @@ import "./Chat.css";
 import { getIsChartDisplayDefault } from "../../api/api";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
 import { fetchModelStatusOnce, fetchModels, pollModelStatus, selectModel } from "../../state/slices/appSlice";
-import { setUserMessage } from "../../state/slices/chatSlice";
+import { setUserMessage, setGeneratingResponse } from "../../state/slices/chatSlice";
 import { useAutoScroll } from "../../hooks/useAutoScroll";
 import { useChatApi } from "../../hooks/useChatApi";
+import { subscribeAskAI } from "../../utils/chatBridge";
 import ChatMessageItem from "./ChatMessageItem";
 
 type ChatProps = {
@@ -152,6 +153,27 @@ const Chat: React.FC<ChatProps> = ({
     questionInputRef.current?.focus();
   }, [sendMessage, userMessage]);
 
+  // Subscribe to drill-drawer "Ask AI about this" requests. The dispatcher in
+  // DrillDrawer.tsx calls startNewConversation() before emitting, which
+  // triggers the in-flight stream abort in useChatApi.ts (the existing
+  // selectedConversationId-change effect). Once that abort settles on the
+  // next microtask, the handler below sends the seeded prompt.
+  useEffect(() => {
+    return subscribeAskAI(({ prompt }) => {
+      if (!prompt || !prompt.trim()) return;
+      dispatch(setUserMessage(prompt));
+      // Ensure no stale generating state blocks the send
+      dispatch(setGeneratingResponse(false));
+      // Defer sendMessage to let React process the startNewConversation
+      // dispatch and the abort-on-conversation-change effect settle.
+      // Without this, sendMessage may see stale generatingResponse=true
+      // and silently bail out, leaving the prompt in the textarea unsent.
+      setTimeout(() => {
+        void sendMessage(prompt);
+      }, 100);
+    });
+  }, [dispatch, sendMessage]);
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -173,6 +195,32 @@ const Chat: React.FC<ChatProps> = ({
     startNewChat();
     questionInputRef.current?.focus();
   }, [startNewChat]);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText) return;
+
+      const textarea = questionInputRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart ?? userMessage.length;
+        const end = textarea.selectionEnd ?? userMessage.length;
+        const newValue =
+          userMessage.slice(0, start) + clipboardText + userMessage.slice(end);
+        dispatch(setUserMessage(newValue));
+        // Restore cursor position after the inserted text
+        requestAnimationFrame(() => {
+          const newCursorPos = start + clipboardText.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+          textarea.focus();
+        });
+      } else {
+        dispatch(setUserMessage(userMessage + clipboardText));
+      }
+    } catch {
+      // Clipboard read failed (permission denied or not available)
+    }
+  }, [dispatch, userMessage]);
 
   return (
     <div className="chat-container">
@@ -301,6 +349,15 @@ const Chat: React.FC<ChatProps> = ({
             rows={2}
             style={{ resize: "none" }}
             appearance="outline"
+          />
+          <DefaultButton
+            iconProps={{ iconName: "ClipboardList" }}
+            role="button"
+            onClick={() => void handlePaste()}
+            disabled={isInputDisabled}
+            className="paste-btn"
+            aria-disabled={isInputDisabled}
+            title="Paste from clipboard"
           />
           <DefaultButton
             iconProps={{ iconName: "Send" }}

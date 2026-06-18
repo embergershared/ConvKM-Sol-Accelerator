@@ -949,6 +949,11 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
         roleDefinitionIdOrName: 'Storage File Data Privileged Contributor'
         principalType: 'ServicePrincipal'
       }
+      {
+        principalId: userAssignedIdentity.outputs.principalId
+        roleDefinitionIdOrName: 'Storage Blob Delegator'
+        principalType: 'ServicePrincipal'
+      }
     ]
     networkAcls: {
       bypass: 'AzureServices, Logging, Metrics'
@@ -1015,7 +1020,17 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
         ]
       : []
     blobServices: {
-      corsRules: []
+      corsRules: [
+        {
+          allowedOrigins: [
+            'https://app-${solutionSuffix}.azurewebsites.net'
+          ]
+          allowedMethods: [ 'GET', 'HEAD', 'OPTIONS' ]
+          allowedHeaders: [ '*' ]
+          exposedHeaders: [ 'Content-Length', 'Content-Type' ]
+          maxAgeInSeconds: 3600
+        }
+      ]
       deleteRetentionPolicyEnabled: false
       changeFeedEnabled: false
       restorePolicyEnabled: false
@@ -1347,11 +1362,13 @@ module webSiteBackend 'modules/web-sites.bicep' = {
           AZURE_AI_SEARCH_CONNECTION_NAME: aiSearchName
           USE_AI_PROJECT_CLIENT: 'True'
           DISPLAY_CHART_DEFAULT: 'False'
+          DISPLAY_CHAT_BY_DEFAULT: 'True'
           APPLICATIONINSIGHTS_CONNECTION_STRING: enableMonitoring ? applicationInsights!.outputs.connectionString : ''
           DUMMY_TEST: 'True'
           SOLUTION_NAME: solutionSuffix
           APP_ENV: 'Prod'
           AZURE_CLIENT_ID: backendUserAssignedIdentity.outputs.clientId
+          STORAGE_ACCOUNT_NAME: storageAccount.outputs.name
           AZURE_BASIC_LOGGING_LEVEL: 'INFO'
           AZURE_PACKAGE_LOGGING_LEVEL: 'WARNING'
           AZURE_LOGGING_PACKAGES: ''
@@ -1529,6 +1546,9 @@ output USE_CHAT_HISTORY_ENABLED string = 'True'
 
 @description('Contains default chart display setting.')
 output DISPLAY_CHART_DEFAULT string = 'False'
+
+@description('Contains default chat display setting.')
+output DISPLAY_CHAT_BY_DEFAULT string = 'True'
 
 @description('Contains Azure AI Agent endpoint URL.')
 output AZURE_AI_AGENT_ENDPOINT string = !empty(existingProjEndpoint) ? existingProjEndpoint : aiFoundryAiServices.outputs.aiProjectInfo.apiEndpoint

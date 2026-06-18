@@ -13,7 +13,11 @@ export type DrillEventName =
   | "DrillLevelChanged"
   | "DrillCallViewed"
   | "DrillResetClicked"
-  | "DrillBackPressed";
+  | "DrillBackPressed"
+  | "CrossFilterApplied"
+  | "CrossFilterRemoved"
+  | "InvestigateClicked"
+  | "AIHandoffClicked";
 
 type DrillEventProperties = {
   dimension?: string;
@@ -21,6 +25,8 @@ type DrillEventProperties = {
   level?: string;
   bucket?: string;
   conversationId?: string;
+  source?: "chart" | "manual" | "hash";
+  chart?: string;
 };
 
 export function trackDrillEvent(

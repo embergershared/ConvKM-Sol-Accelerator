@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import Chart from "./components/Chart/Chart";
 import Chat from "./components/Chat/Chat";
 import {
-  Avatar,
   Body2,
   Button,
   FluentProvider,
@@ -12,7 +11,7 @@ import {
 import { SparkleRegular } from "@fluentui/react-icons";
 import "./App.css";
 import { ChatHistoryPanel } from "./components/ChatHistoryPanel/ChatHistoryPanel";
-import { getUserInfo } from "./api/api";
+import { getUserInfo, getIsChatDisplayDefault } from "./api/api";
 import { useAppDispatch, useAppSelector } from "./state/hooks";
 import {
   fetchLayoutConfig,
@@ -27,12 +26,17 @@ import {
 } from "./state/slices/chatHistorySlice";
 import { resetChatState, setMessages } from "./state/slices/chatSlice";
 import { hideCitation } from "./state/slices/citationSlice";
-import { restoreStack } from "./state/slices/drillSlice";
+import { closeDrill, restoreStack } from "./state/slices/drillSlice";
+import {
+  resetSelectedFilters,
+  clearChips,
+} from "./state/slices/dashboardSlice";
 import { decodeDrillStack } from "./utils/drillHash";
 import DrillDrawer from "./components/Drill/DrillDrawer";
 import { AppLogo } from "./components/Svg/Svg";
 import CustomSpinner from "./components/CustomSpinner/CustomSpinner";
 import CitationPanel from "./components/CitationPanel/CitationPanel";
+import UserMenu from "./components/UserMenu/UserMenu";
 
 const panels = {
   DASHBOARD: "DASHBOARD",
@@ -115,6 +119,18 @@ const Dashboard: React.FC = () => {
     };
 
     void hydrateUser();
+  }, []);
+
+  useEffect(() => {
+    const hydrateChatDefault = async () => {
+      const { isChatDisplayDefault } = await getIsChatDisplayDefault();
+      setPanelShowStates((prev) => ({
+        ...prev,
+        [panels.CHAT]: isChatDisplayDefault,
+      }));
+    };
+
+    void hydrateChatDefault();
   }, []);
 
   const updateLayoutWidths = useCallback(
@@ -275,7 +291,15 @@ const Dashboard: React.FC = () => {
         <div className="header-left-section">
           <AppLogo />
           <Subtitle2>
-            Southern Company <Body2 style={{ gap: "10px" }}>| Customer Calls Sentiment Analysis</Body2>
+            Southern Company <Body2
+              style={{ gap: "10px", cursor: "pointer" }}
+              onClick={() => {
+                dispatch(resetSelectedFilters());
+                dispatch(clearChips());
+                dispatch(closeDrill());
+                window.location.hash = "";
+              }}
+            >| Customer Calls Sentiment Analysis</Body2>
           </Subtitle2>
         </div>
         <div className="header-right-section">
@@ -293,9 +317,7 @@ const Dashboard: React.FC = () => {
           >
             {`${panelShowStates[panels.CHAT] ? "Hide" : "Show"} Chat`}
           </Button>
-          <div>
-            <Avatar name={name} title={name} />
-          </div>
+          <UserMenu userName={name} />
         </div>
       </div>
       <div className="main-container">
@@ -349,7 +371,13 @@ const Dashboard: React.FC = () => {
             </div>
           )}
       </div>
-      <DrillDrawer />
+      <DrillDrawer
+        onRequestShowChat={() => {
+          if (!panelShowStates[panels.CHAT]) {
+            onHandlePanelStates(panels.CHAT);
+          }
+        }}
+      />
     </FluentProvider>
   );
 };

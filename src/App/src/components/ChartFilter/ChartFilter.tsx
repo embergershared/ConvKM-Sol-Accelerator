@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Stack,
   DefaultButton,
@@ -14,7 +14,11 @@ import "./ChartFilter.css";
 import { type SelectedFilters } from "../../types/AppTypes";
 import { defaultSelectedFilters, sentimentIcons } from "../../configs/Utils";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
-import { setSelectedFilters as setSelectedDashboardFilters } from "../../state/slices/dashboardSlice";
+import {
+  setSelectedFilters as setSelectedDashboardFilters,
+  addChip,
+  clearChips,
+} from "../../state/slices/dashboardSlice";
 import {
   ArrowClockwise20Regular,
   CalendarLtr20Regular,
@@ -23,6 +27,7 @@ import {
   EmojiMeh20Regular,
   EmojiMultiple20Regular,
   EmojiSad20Regular,
+  MicRegular,
 } from "@fluentui/react-icons";
 interface FilterComponentProps {
   applyFilters: (updatedFilters: SelectedFilters) => void;
@@ -40,6 +45,10 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
     ? selectedFilters.DateRange
     : [""];
 
+  const chartFilterChips = useAppSelector(
+    (state) => state.dashboards.chartFilterChips
+  );
+
   const [selectedDateRange, setSelectedDateRange] = useState<string[]>(
     initialDateRange as string[]
   );
@@ -49,6 +58,32 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
     selectedFilters.Topic as string[]
   );
+  const [selectedRecording, setSelectedRecording] = useState<string[]>(
+    (selectedFilters.Recording as string[]) || ["all"]
+  );
+
+  // Sync chips → local state: when a chip is removed/cleared from the
+  // SelectionPillBar, reflect that removal in the bottom filter bar's local
+  // state so both UIs stay consistent.
+  useEffect(() => {
+    const topicChipValues = chartFilterChips
+      .filter((c) => c.dimension === "Topic")
+      .map((c) => c.value);
+    const sentimentChipValues = chartFilterChips
+      .filter((c) => c.dimension === "Sentiment")
+      .map((c) => c.value);
+
+    // Sync topics: local state should match chip values (for chart-origin chips
+    // these are additive; for manual chips they mirror what the user selected)
+    setSelectedTopics(topicChipValues);
+
+    // Sync sentiment: if a sentiment chip exists, select it; otherwise reset
+    if (sentimentChipValues.length > 0) {
+      setSelectedCsat(sentimentChipValues);
+    } else {
+      setSelectedCsat(defaultSelectedFilters.Sentiment as string[]);
+    }
+  }, [chartFilterChips]);
 
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const [isCsatMenuOpen, setIsCsatMenuOpen] = useState(false);
@@ -85,20 +120,45 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
     setIsCsatMenuOpen(false);
   };
 
+  const handleRecordingSelection = (key: string) => {
+    setSelectedRecording([key]);
+  };
+
   const handleApplyFilters = () => {
     const startDate = selectedDateRange || [""];
     const updatedFilters: SelectedFilters = {};
     updatedFilters.Topic = selectedTopics;
     updatedFilters.Sentiment = selectedCsat;
     updatedFilters.DateRange = startDate;
+    updatedFilters.Recording = selectedRecording;
     applyFilters(updatedFilters);
     dispatch(setSelectedDashboardFilters(updatedFilters));
+
+    // Sync local selections → chips so the SelectionPillBar reflects what the
+    // user chose in the bottom filter bar. Clear previous manual chips first
+    // to avoid stale entries, then re-add current selections.
+    dispatch(clearChips("manual"));
+    for (const topic of selectedTopics) {
+      dispatch(addChip({ dimension: "Topic", value: topic, source: "manual" }));
+    }
+    const sentimentVal = selectedCsat?.[0];
+    if (sentimentVal && sentimentVal.toLowerCase() !== "all") {
+      dispatch(
+        addChip({ dimension: "Sentiment", value: sentimentVal, source: "manual" })
+      );
+    }
   };
 
   const handleResetFilters = () => {
-    setSelectedDateRange(defaultSelectedFilters.DateRange as string[]);
-    setSelectedCsat(defaultSelectedFilters.Sentiment); // Assuming "all" is the key for the "all" sentiment
-    setSelectedTopics(defaultSelectedFilters.Topic as []);
+    const resetFilters = { ...defaultSelectedFilters };
+    setSelectedDateRange(resetFilters.DateRange as string[]);
+    setSelectedCsat(resetFilters.Sentiment);
+    setSelectedTopics(resetFilters.Topic as []);
+    setSelectedRecording(resetFilters.Recording as string[]);
+    dispatch(clearChips());
+    // Apply immediately so the dashboard refreshes in one click
+    applyFilters(resetFilters);
+    dispatch(setSelectedDashboardFilters(resetFilters));
   };
   const getDisplayValue = (
     filterList: { key: string; displayValue: string }[],
@@ -285,6 +345,34 @@ const ChartFilter: React.FC<FilterComponentProps> = (props) => {
           onClick={() => setIsTopicsMenuOpen(!isTopicsMenuOpen)}
           disabled={fetchingCharts}
           menuProps={topicMenuProps}
+        />
+        <VerticalDivider />
+        <DefaultButton
+          onRenderIcon={() => <MicRegular />}
+          text={
+            selectedRecording?.[0] === "all"
+              ? "Recording"
+              : selectedRecording?.[0] || "Recording"
+          }
+          menuProps={{
+            items: (filtersMeta?.Recording || [
+              { key: "all", displayValue: "all" },
+              { key: "With Recording", displayValue: "With Recording" },
+              { key: "Without Recording", displayValue: "Without Recording" },
+            ]).map((option) => ({
+              key: String(option.key),
+              text: option.displayValue === "all" ? "All" : option.displayValue,
+              canCheck: true,
+              checked: option.key === selectedRecording?.[0],
+              onClick: () => handleRecordingSelection(String(option.key)),
+            })),
+            directionalHint: DirectionalHint.topLeftEdge,
+            calloutProps: {
+              directionalHintFixed: true,
+              styles: { calloutMain: { maxHeight: 300, overflowY: "auto" } },
+            },
+          }}
+          disabled={fetchingCharts}
         />
         <VerticalDivider />
         <DefaultButton

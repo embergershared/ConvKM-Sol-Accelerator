@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../state/hooks";
-import { fetchCallDetail } from "../../api/api";
+import { fetchCallDetail, fetchAudioUrl, type AudioAvailability } from "../../api/api";
 import {
   setCall,
   setError,
@@ -22,6 +22,7 @@ const CallTranscript: React.FC = () => {
   const call = useAppSelector((s) => s.drill.call);
   const loading = useAppSelector((s) => s.drill.loading);
   const error = useAppSelector((s) => s.drill.error);
+  const [audio, setAudio] = useState<AudioAvailability>({ available: false });
 
   const level = stack.find((l) => l.kind === "transcript") as
     | (DrillLevel & { kind: "transcript" })
@@ -33,8 +34,14 @@ const CallTranscript: React.FC = () => {
     (async () => {
       dispatch(setLoading(true));
       try {
-        const data = await fetchCallDetail(level.conversationId);
-        if (!cancelled) dispatch(setCall(data));
+        const [data, audioResult] = await Promise.all([
+          fetchCallDetail(level.conversationId),
+          fetchAudioUrl(level.conversationId),
+        ]);
+        if (!cancelled) {
+          dispatch(setCall(data));
+          setAudio(audioResult);
+        }
       } catch (e: any) {
         if (!cancelled)
           dispatch(setError(e?.message ?? "Failed to load transcript"));
@@ -96,6 +103,22 @@ const CallTranscript: React.FC = () => {
               {p}
             </Tag>
           ))}
+        </div>
+      )}
+
+      {audio.available && audio.url && (
+        <div style={{ marginTop: 12 }}>
+          <Subtitle2 as="h3" block>
+            Recording
+          </Subtitle2>
+          <audio
+            controls
+            preload="metadata"
+            src={audio.url}
+            style={{ width: "100%", marginTop: 4 }}
+          >
+            Your browser does not support the audio element.
+          </audio>
         </div>
       )}
 

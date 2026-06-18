@@ -27,6 +27,37 @@ header {
   background-color: white;
   padding: 0.7rem;
   border-radius: 8px;
+  position: relative;
+}
+
+.chart-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.chart-item .chart-title {
+  margin: 0;
+}
+
+/* Stage C — Investigate button.
+ * On pointer devices: hidden until the user hovers/focuses the chart tile
+ * (low visual noise). On touch devices: always visible (no hover to reveal).
+ * Keyboard users get focus visibility for free via :focus-within. */
+.chart-item .investigate-btn {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.chart-item:hover .investigate-btn,
+.chart-item:focus-within .investigate-btn {
+  opacity: 1;
+}
+@media (hover: none) {
+  .chart-item .investigate-btn {
+    opacity: 1;
+  }
 }
 
 .chart-title {

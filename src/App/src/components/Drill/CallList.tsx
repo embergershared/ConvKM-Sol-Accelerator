@@ -19,7 +19,9 @@ import {
   TableHeaderCell,
   TableRow,
   Tag,
+  Tooltip,
 } from "@fluentui/react-components";
+import { MicRegular } from "@fluentui/react-icons";
 import type { CallListItem, DrillLevel } from "../../types/Drill";
 import "./drill.css";
 
@@ -101,6 +103,7 @@ const CallList: React.FC = () => {
           <Table aria-label="Drill call list" size="small">
             <TableHeader>
               <TableRow>
+                <TableHeaderCell style={{ width: 32 }}></TableHeaderCell>
                 <TableHeaderCell>Start</TableHeaderCell>
                 <TableHeaderCell>Duration</TableHeaderCell>
                 <TableHeaderCell>Sentiment</TableHeaderCell>
@@ -126,6 +129,13 @@ const CallList: React.FC = () => {
                   }}
                   style={{ cursor: "pointer" }}
                 >
+                  <TableCell style={{ width: 32, textAlign: "center" }}>
+                    {item.has_audio && (
+                      <Tooltip content="Recording available" relationship="label">
+                        <MicRegular style={{ fontSize: 16, color: "#0078d4" }} />
+                      </Tooltip>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {new Date(item.start_time).toLocaleString()}
                   </TableCell>
