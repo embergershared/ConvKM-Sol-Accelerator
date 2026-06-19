@@ -154,7 +154,7 @@ const TimeTrendChart: React.FC = () => {
       )
       .style("text-anchor", "middle")
       .style("font-size", "11px")
-      .style("fill", "#107c10")
+      .style("fill", "#E36209")
       .text("Avg sentiment (-1 to +1)");
 
     // Shared tooltip container — appended inside the SVG's parent so it
@@ -286,7 +286,7 @@ const TimeTrendChart: React.FC = () => {
     g.append("path")
       .datum(data)
       .attr("fill", "none")
-      .attr("stroke", "#107c10")
+      .attr("stroke", "#E36209")
       .attr("stroke-width", 2)
       .attr("d", line);
 
@@ -299,7 +299,7 @@ const TimeTrendChart: React.FC = () => {
       .attr("cx", (d) => (x(d.bucket_start) ?? 0) + x.bandwidth() / 2)
       .attr("cy", (d) => yRight(d.avg_sentiment_score))
       .attr("r", 3)
-      .attr("fill", "#107c10")
+      .attr("fill", "#E36209")
       .style("pointer-events", "all")
       .on("mouseover", (_event, d) => {
         tooltip.style("display", "block").html(formatTooltip(d));
@@ -408,7 +408,7 @@ const TimeTrendChart: React.FC = () => {
               style={{
                 width: 14,
                 height: 2,
-                background: "#107c10",
+                background: "#E36209",
                 display: "inline-block",
               }}
             />
