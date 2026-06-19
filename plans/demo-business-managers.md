@@ -167,6 +167,8 @@ Generate a lines chart of the count of conversations by sentiment per day for th
 ```
 *Wait for the chart to render inline. This is the "wow" moment for AI capabilities.*
 
+Switch model: grok then gpt
+
 **Prompt 3 — Insight discovery with citations:**
 ```
 What are top 3 challenges user reported?
@@ -239,13 +241,13 @@ Click on one of the citation chips from a previous chat response. Show the citat
 ## Step 8 — Closing: The Business Impact (1 min)
 
 ### What to say
-> "Let me recap what we just did in under 20 minutes:"
+> "Let me recap what we saw during these 20 minutes:"
 >
-> "We looked at thousands of calls through the dashboard, spotted a negative sentiment trend, drilled down to the specific calls causing it, read the actual transcripts, asked the AI to find patterns, generated charts on the fly, and created a ready-to-use FAQ for our agents."
+> "We looked at hundreds of calls through the dashboard, spotted a negative sentiment trend, drilled down to the specific calls causing it, read the actual transcripts, listen to the calls recording, asked the AI to find patterns, generate charts on the fly, and create a ready-to-use FAQ for our agents."
 >
 > "Without this solution, that workflow would take an analyst days — pulling data, building reports, reading transcripts manually. With AI, it takes minutes."
 >
-> "This is what AI turns thousands of call transcripts into actionable insights in seconds looks like in practice."
+> "This is what AI turns hundreds of call transcripts into actionable insights in seconds looks like in practice."
 >
 > "The solution runs entirely in your Azure environment — your data stays in your cloud, secured by your policies. And because it's built on Microsoft AI Foundry, it scales with your call volume."
 
